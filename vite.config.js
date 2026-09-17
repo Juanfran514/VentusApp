@@ -42,3 +42,6 @@ export default defineConfig({
     })
   ],
 });
+
+
+//CAMBIO PARA QUE ACEPTE EL NUEVO WORKFLOW
