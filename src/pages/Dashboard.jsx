@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
@@ -13,8 +13,19 @@ const Dashboard = () => {
   const pagos = useLiveQuery(() => db.pagos.toArray(), []);
   const gastos = useLiveQuery(() => db.gastos.toArray(), []);
 
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+
+  const meses = [
+    { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' }, { value: 3, label: 'Marzo' },
+    { value: 4, label: 'Abril' }, { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' }, { value: 9, label: 'Septiembre' },
+    { value: 10, label: 'Octubre' }, { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' }
+  ];
+
+  // Generamos años desde 2023 hasta el actual + 1
+  const años = Array.from(new Array(5), (val, index) => today.getFullYear() - 2 + index);
 
   // KPIs
   const activeStudentsCount = useMemo(() => {
@@ -25,19 +36,19 @@ const Dashboard = () => {
   const currentMonthIncome = useMemo(() => {
     if (!pagos) return 0;
     return pagos
-      .filter(p => p.mes === currentMonth && p.año === currentYear && p.estado === 'pagado')
+      .filter(p => p.mes === selectedMonth && p.año === selectedYear && p.estado === 'pagado')
       .reduce((sum, p) => sum + Number(p.importe), 0);
-  }, [pagos, currentMonth, currentYear]);
+  }, [pagos, selectedMonth, selectedYear]);
 
   const currentMonthExpenses = useMemo(() => {
     if (!gastos) return 0;
     return gastos
       .filter(g => {
         const date = new Date(g.fecha);
-        return (date.getMonth() + 1) === currentMonth && date.getFullYear() === currentYear;
+        return (date.getMonth() + 1) === selectedMonth && date.getFullYear() === selectedYear;
       })
       .reduce((sum, g) => sum + Number(g.importe), 0);
-  }, [gastos, currentMonth, currentYear]);
+  }, [gastos, selectedMonth, selectedYear]);
 
   const netProfit = currentMonthIncome - currentMonthExpenses;
 
@@ -47,12 +58,12 @@ const Dashboard = () => {
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
     for (let m = 1; m <= 12; m++) {
-      const incomeForMonth = pagos?.filter(p => p.mes === m && p.año === currentYear && p.estado === 'pagado')
+      const incomeForMonth = pagos?.filter(p => p.mes === m && p.año === selectedYear && p.estado === 'pagado')
                                   .reduce((sum, p) => sum + Number(p.importe), 0) || 0;
       
       const expensesForMonth = gastos?.filter(g => {
         const date = new Date(g.fecha);
-        return (date.getMonth() + 1) === m && date.getFullYear() === currentYear;
+        return (date.getMonth() + 1) === m && date.getFullYear() === selectedYear;
       }).reduce((sum, g) => sum + Number(g.importe), 0) || 0;
 
       data.push({
@@ -62,7 +73,7 @@ const Dashboard = () => {
       });
     }
     return data;
-  }, [pagos, gastos, currentYear]);
+  }, [pagos, gastos, selectedYear]);
 
   // Pie Chart Data: Expenses by Category for the current month
   const expensesByCategory = useMemo(() => {
@@ -70,7 +81,7 @@ const Dashboard = () => {
     
     const currentMonthG = gastos.filter(g => {
       const date = new Date(g.fecha);
-      return (date.getMonth() + 1) === currentMonth && date.getFullYear() === currentYear;
+      return (date.getMonth() + 1) === selectedMonth && date.getFullYear() === selectedYear;
     });
 
     const categoryMap = {};
@@ -83,15 +94,33 @@ const Dashboard = () => {
       name: key,
       value: categoryMap[key]
     })).sort((a, b) => b.value - a.value);
-  }, [gastos, currentMonth, currentYear]);
+  }, [gastos, selectedMonth, selectedYear]);
 
   const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#8b5cf6'];
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1>Dashboard</h1>
-        <p>Resumen financiero y estado de la academia ({currentYear})</p>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1>Dashboard</h1>
+          <p>Resumen financiero y estado de la academia</p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <select 
+            value={selectedMonth} 
+            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+            style={{ width: 'auto' }}
+          >
+            {meses.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <select 
+            value={selectedYear} 
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            style={{ width: 'auto' }}
+          >
+            {años.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="kpi-grid">
@@ -129,7 +158,7 @@ const Dashboard = () => {
       <div className="charts-grid">
         <div className="chart-card">
           <div className="chart-header">
-            <div className="chart-title">Flujo de Caja ({currentYear})</div>
+            <div className="chart-title">Flujo de Caja ({selectedYear})</div>
           </div>
           <div style={{ flex: 1, width: '100%', minHeight: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -160,7 +189,7 @@ const Dashboard = () => {
 
         <div className="chart-card">
           <div className="chart-header">
-            <div className="chart-title">Gastos por Categoría (Este Mes)</div>
+            <div className="chart-title">Gastos por Categoría ({meses.find(m => m.value === selectedMonth)?.label})</div>
           </div>
           <div style={{ flex: 1, width: '100%', minHeight: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {expensesByCategory.length > 0 ? (
