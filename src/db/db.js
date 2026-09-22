@@ -95,27 +95,3 @@ db.grupos.mapToClass(Grupo);
 db.pagos.mapToClass(Pago);
 db.gastos.mapToClass(Gasto);
 
-// ==========================================
-// FUNCIÓN PARA DATOS DE PRUEBA (SEED)
-// ==========================================
-export async function seedDatabase() {
-  const count = await db.grupos.count();
-  if (count === 0) {
-    console.log('Insertando datos de prueba (Seed)...');
-
-    const grupoKickboxingId = await db.grupos.add(new Grupo({
-      nombre: 'Kickboxing', actividad: 'Kickboxing', horarios: 'L-X 17:00-18:00', plazasMax: 20,
-      tarifas: { 1: 25, 2: 40, 3: 50 }
-    }));
-    const grupoTaekwondoId = await db.grupos.add(new Grupo({
-      nombre: 'Taekwondo', actividad: 'Taekwondo', horarios: 'M-J 19:00-20:30', plazasMax: 15,
-      tarifas: { 1: 30, 2: 45, 3: 60 }
-    }));
-
-    await db.alumnos.bulkAdd([
-      new Alumno({ nombre: 'Juan', apellidos: 'Pérez', telefono: '600123456', grupoId: grupoKickboxingId, grupos: [grupoKickboxingId], cuota: 40, estado: 'activo' }),
-      new Alumno({ nombre: 'María', apellidos: 'López', telefono: '600987654', grupoId: grupoTaekwondoId, grupos: [grupoTaekwondoId], cuota: 45, estado: 'activo' })
-    ]);
-  }
-}
-
