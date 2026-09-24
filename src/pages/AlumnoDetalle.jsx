@@ -11,23 +11,43 @@ import {
 import './AlumnoDetalle.css';
 import './Alumnos.css';
 
-// Lista de cinturones estándar con clases CSS asociadas
+// Lista de cinturones oficiales de Taekwondo ITF (Gup y Dan)
 const CINTURONES_DISPONIBLES = [
-  { nombre: 'Blanco', cssClass: 'belt-blanco' },
-  { nombre: 'Blanco-Amarillo', cssClass: 'belt-blanco-amarillo' },
-  { nombre: 'Amarillo', cssClass: 'belt-amarillo' },
-  { nombre: 'Amarillo-Naranja', cssClass: 'belt-amarillo-naranja' },
-  { nombre: 'Naranja', cssClass: 'belt-naranja' },
-  { nombre: 'Naranja-Verde', cssClass: 'belt-naranja-verde' },
-  { nombre: 'Verde', cssClass: 'belt-verde' },
-  { nombre: 'Verde-Azul', cssClass: 'belt-verde-azul' },
-  { nombre: 'Azul', cssClass: 'belt-azul' },
-  { nombre: 'Azul-Marrón', cssClass: 'belt-azul-marron' },
-  { nombre: 'Marrón', cssClass: 'belt-marron' },
+  { nombre: 'Blanco (10º Gup)', cssClass: 'belt-blanco' },
+  { nombre: 'Blanco punta Amarilla (9º Gup)', cssClass: 'belt-blanco-amarillo' },
+  { nombre: 'Amarillo (8º Gup)', cssClass: 'belt-amarillo' },
+  { nombre: 'Amarillo punta Verde (7º Gup)', cssClass: 'belt-amarillo-verde' },
+  { nombre: 'Verde (6º Gup)', cssClass: 'belt-verde' },
+  { nombre: 'Verde punta Azul (5º Gup)', cssClass: 'belt-verde-azul' },
+  { nombre: 'Azul (4º Gup)', cssClass: 'belt-azul' },
+  { nombre: 'Azul punta Roja (3º Gup)', cssClass: 'belt-azul-rojo' },
+  { nombre: 'Rojo (2º Gup)', cssClass: 'belt-rojo' },
+  { nombre: 'Rojo punta Negra (1º Gup)', cssClass: 'belt-rojo-negro' },
   { nombre: 'Negro 1º Dan', cssClass: 'belt-negro' },
   { nombre: 'Negro 2º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 3º Dan', cssClass: 'belt-negro' }
+  { nombre: 'Negro 3º Dan', cssClass: 'belt-negro' },
+  { nombre: 'Negro 4º Dan', cssClass: 'belt-negro' },
+  { nombre: 'Negro 5º Dan', cssClass: 'belt-negro' },
+  { nombre: 'Negro 6º Dan', cssClass: 'belt-negro' }
 ];
+
+
+const getBeltClass = (cinturon) => {
+  if (!cinturon) return 'belt-blanco';
+  const c = cinturon.toLowerCase();
+  if (c.includes('blanco') && (c.includes('amarill') || c.includes('9'))) return 'belt-blanco-amarillo';
+  if (c.includes('blanco')) return 'belt-blanco';
+  if (c.includes('amarill') && (c.includes('verd') || c.includes('7'))) return 'belt-amarillo-verde';
+  if (c.includes('amarill')) return 'belt-amarillo';
+  if (c.includes('verd') && (c.includes('azul') || c.includes('5'))) return 'belt-verde-azul';
+  if (c.includes('verd')) return 'belt-verde';
+  if (c.includes('azul') && (c.includes('roj') || c.includes('3'))) return 'belt-azul-rojo';
+  if (c.includes('azul')) return 'belt-azul';
+  if (c.includes('roj') && (c.includes('negr') || c.includes('1'))) return 'belt-rojo-negro';
+  if (c.includes('roj')) return 'belt-rojo';
+  if (c.includes('negr') || c.includes('dan')) return 'belt-negro';
+  return 'belt-blanco';
+};
 
 const AlumnoDetalle = () => {
   const { id } = useParams();
@@ -86,6 +106,7 @@ const AlumnoDetalle = () => {
   const edadCalculada = useMemo(() => {
     if (!alumno?.fechaNac) return null;
     const diff = Date.now() - new Date(alumno.fechaNac).getTime();
+    if (isNaN(diff)) return null;
     const ageDate = new Date(diff);
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   }, [alumno?.fechaNac]);
@@ -189,7 +210,7 @@ const AlumnoDetalle = () => {
       telefono: alumno.telefono || '',
       nTutor: alumno.nTutor || '',
       email: alumno.email || '',
-      cinturon: alumno.cinturon || 'Blanco',
+      cinturon: alumno.cinturon || 'Blanco (10º Gup)',
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
       observaciones: alumno.observaciones || '',
@@ -344,8 +365,7 @@ const AlumnoDetalle = () => {
   }
 
   // Clase del cinturón actual
-  const beltObj = CINTURONES_DISPONIBLES.find(c => c.nombre.toLowerCase() === (alumno.cinturon || '').toLowerCase());
-  const beltClass = beltObj ? beltObj.cssClass : 'belt-blanco';
+  const beltClass = getBeltClass(alumno.cinturon);
 
   return (
     <div className="alumno-detalle-container">
@@ -384,10 +404,10 @@ const AlumnoDetalle = () => {
             {/* Grado / Cinturón con selector rápido */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span className={`belt-tag ${beltClass}`}>
-                <Award size={16} /> {alumno.cinturon || 'Blanco'}
+                <Award size={16} /> {alumno.cinturon || 'Blanco (10º Gup)'}
               </span>
               <select
-                value={alumno.cinturon || 'Blanco'}
+                value={alumno.cinturon || 'Blanco (10º Gup)'}
                 onChange={(e) => handleCambioCinturon(e.target.value)}
                 style={{ width: 'auto', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
                 title="Cambiar grado/cinturón"
@@ -887,9 +907,9 @@ const AlumnoDetalle = () => {
             />
           </div>
           <div className="form-group">
-            <label>Cinturón / Grado Actual</label>
+            <label>Cinturón / Grado (Taekwondo ITF)</label>
             <select
-              value={editFormData.cinturon}
+              value={editFormData.cinturon || 'Blanco (10º Gup)'}
               onChange={(e) => setEditFormData({ ...editFormData, cinturon: e.target.value })}
             >
               {CINTURONES_DISPONIBLES.map(c => (
