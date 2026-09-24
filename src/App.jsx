@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Alumnos from './pages/Alumnos';
+import AlumnoDetalle from './pages/AlumnoDetalle';
 import Grupos from './pages/Grupos';
 import Cobros from './pages/Cobros';
 import Examenes from './pages/Examenes';
@@ -17,6 +18,7 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="alumnos" element={<Alumnos />} />
+          <Route path="alumnos/:id" element={<AlumnoDetalle />} />
           <Route path="grupos" element={<Grupos />} />
           <Route path="cobros" element={<Cobros />} />
           <Route path="examenes" element={<Examenes />} />

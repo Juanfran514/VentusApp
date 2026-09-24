@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Alumno } from '../db/db';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Eye, Award } from 'lucide-react';
 import './Alumnos.css';
 
 const Alumnos = () => {
@@ -11,8 +12,8 @@ const Alumnos = () => {
   const [editingId, setEditingId] = useState(null);
   
   const [formData, setFormData] = useState({
-    nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '',
-    cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+    nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
+    cinturon: 'Blanco', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
   });
 
   const gruposDisponibles = useLiveQuery(() => db.grupos.toArray());
@@ -79,8 +80,8 @@ const Alumnos = () => {
 
   const openNewModal = () => {
     setFormData({
-      nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '',
-      estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+      nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
+      cinturon: 'Blanco', estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
     });
     setEditingId(null);
     setIsModalOpen(true);
@@ -93,6 +94,8 @@ const Alumnos = () => {
       fechaNac: alumno.fechaNac || '',
       telefono: alumno.telefono || '',
       nTutor: alumno.nTutor || '',
+      email: alumno.email || '',
+      cinturon: alumno.cinturon || 'Blanco',
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
       observaciones: alumno.observaciones || '',
@@ -201,8 +204,13 @@ const Alumnos = () => {
               {alumnos?.map(alumno => (
                 <tr key={alumno.id}>
                   <td>
-                    <strong>{alumno.nombreCompleto}</strong>
-                    <br/><small className="text-muted">{alumno.telefono || 'Sin teléfono'}</small>
+                    <Link to={`/alumnos/${alumno.id}`} style={{ color: 'inherit', textDecoration: 'none' }} title="Ver ficha del alumno">
+                      <strong style={{ color: 'var(--primary-color)' }}>{alumno.nombreCompleto}</strong>
+                    </Link>
+                    <br/>
+                    <small className="text-muted">
+                      {alumno.telefono || 'Sin teléfono'} {alumno.cinturon ? `• ${alumno.cinturon}` : ''}
+                    </small>
                   </td>
                   <td>{alumno.infoGrupos}</td>
                   <td>{alumno.cuota} €</td>
@@ -217,6 +225,9 @@ const Alumnos = () => {
                     </span>
                   </td>
                   <td>
+                    <Link to={`/alumnos/${alumno.id}`} className="btn-icon text-primary" title="Ver Ficha Detallada">
+                      <Eye size={18} />
+                    </Link>
                     <button className="btn-icon text-muted" title="Editar" onClick={() => openEditModal(alumno)}><Edit2 size={18} /></button>
                     <button className="btn-icon text-danger" title="Eliminar" onClick={() => handleDelete(alumno.id)}>
                       <Trash2 size={18} />
@@ -255,6 +266,29 @@ const Alumnos = () => {
           <div className="form-group">
             <label>Nombre del Tutor (si es menor)</label>
             <input name="nTutor" value={formData.nTutor} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label>Email</label>
+            <input type="email" name="email" value={formData.email || ''} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label>Cinturón / Grado Actual</label>
+            <select name="cinturon" value={formData.cinturon || 'Blanco'} onChange={handleInputChange}>
+              <option value="Blanco">Blanco</option>
+              <option value="Blanco-Amarillo">Blanco-Amarillo</option>
+              <option value="Amarillo">Amarillo</option>
+              <option value="Amarillo-Naranja">Amarillo-Naranja</option>
+              <option value="Naranja">Naranja</option>
+              <option value="Naranja-Verde">Naranja-Verde</option>
+              <option value="Verde">Verde</option>
+              <option value="Verde-Azul">Verde-Azul</option>
+              <option value="Azul">Azul</option>
+              <option value="Azul-Marrón">Azul-Marrón</option>
+              <option value="Marrón">Marrón</option>
+              <option value="Negro 1º Dan">Negro 1º Dan</option>
+              <option value="Negro 2º Dan">Negro 2º Dan</option>
+              <option value="Negro 3º Dan">Negro 3º Dan</option>
+            </select>
           </div>
           <div className="form-group">
             <label>Estado</label>

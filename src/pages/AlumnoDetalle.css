@@ -1,0 +1,387 @@
+/* Contenedor general */
+.alumno-detalle-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Cabecera y Navegación */
+.detalle-top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--bg-panel);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+  background-color: var(--border-color);
+  color: #fff;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Tarjeta Principal de Perfil */
+.profile-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.75rem;
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-color), #3b82f6, #8b5cf6);
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.profile-avatar {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border: 3px solid var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.profile-main-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.profile-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-light);
+  margin: 0;
+}
+
+/* Cinturón deportivo visual */
+.belt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Colores de cinturones */
+.belt-blanco { background-color: #f8fafc; color: #0f172a; border-color: #cbd5e1; }
+.belt-blanco-amarillo { background: linear-gradient(90deg, #f8fafc 50%, #facc15 50%); color: #0f172a; }
+.belt-amarillo { background-color: #facc15; color: #854d0e; }
+.belt-amarillo-naranja { background: linear-gradient(90deg, #facc15 50%, #fb923c 50%); color: #431407; }
+.belt-naranja { background-color: #fb923c; color: #431407; }
+.belt-naranja-verde { background: linear-gradient(90deg, #fb923c 50%, #22c55e 50%); color: #052e16; }
+.belt-verde { background-color: #22c55e; color: #052e16; }
+.belt-verde-azul { background: linear-gradient(90deg, #22c55e 50%, #3b82f6 50%); color: #0f172a; }
+.belt-azul { background-color: #3b82f6; color: #ffffff; }
+.belt-azul-marron { background: linear-gradient(90deg, #3b82f6 50%, #92400e 50%); color: #ffffff; }
+.belt-marron { background-color: #92400e; color: #ffffff; }
+.belt-negro { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; }
+
+.profile-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.profile-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.profile-meta-item strong {
+  color: var(--text-light);
+}
+
+.profile-meta-item a {
+  color: var(--text-light);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.profile-meta-item a:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+/* Botones de acción rápida en perfil */
+.profile-actions-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 130px;
+}
+
+/* Métricas del Alumno (KPIs) */
+.student-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.student-kpi-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.student-kpi-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.student-kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-light);
+}
+
+.student-kpi-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.kpi-danger {
+  color: var(--danger-color);
+}
+
+.kpi-success {
+  color: var(--primary-color);
+}
+
+/* Pestañas de la Ficha */
+.tabs-navigation {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.2s;
+}
+
+.tab-button:hover {
+  color: var(--text-light);
+}
+
+.tab-button.active {
+  color: var(--primary-color);
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -0.55rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--primary-color);
+}
+
+/* Tarjetas de Grupos inscritos */
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.student-group-card {
+  background-color: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.group-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.group-activity-badge {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.group-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background-color: var(--bg-panel);
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+/* Sección de Salud y Observaciones */
+.health-notes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.note-card {
+  background-color: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.note-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.note-card.medical {
+  border-left: 4px solid #ef4444;
+}
+
+.note-card.medical .note-card-title {
+  color: #ef4444;
+}
+
+.note-card.general {
+  border-left: 4px solid #3b82f6;
+}
+
+.note-card.general .note-card-title {
+  color: #60a5fa;
+}
+
+.note-content {
+  color: var(--text-light);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+
+/* Responsividad Tablet / Móvil */
+@media (max-width: 900px) {
+  .profile-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-meta-grid {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .profile-name-row {
+    justify-content: center;
+  }
+
+  .profile-actions-bar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .profile-actions-bar a,
+  .profile-actions-bar button {
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+
+  .health-notes-grid {
+    grid-template-columns: 1fr;
+  }
+}

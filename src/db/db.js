@@ -31,7 +31,10 @@ export class Alumno {
     estado = 'activo', // 'activo' o 'baja'
     inscripciones = [], // Array de { grupoId: X, dias: Y }
     observaciones = '',
-    lesiones = ''
+    lesiones = '',
+    cinturon = 'Blanco',
+    email = '',
+    fechaAlta = new Date().toISOString()
   } = {}) {
     this.nombre = nombre;
     this.apellidos = apellidos;
@@ -44,6 +47,9 @@ export class Alumno {
     this.inscripciones = inscripciones;
     this.observaciones = observaciones;
     this.lesiones = lesiones;
+    this.cinturon = cinturon;
+    this.email = email;
+    this.fechaAlta = fechaAlta;
   }
 
   get isActivo() {
