@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { exportarCopiaSeguridad, restaurarCopiaSeguridad } from '../../utils/backup';
+import logoImg from '../../assets/logo.png';
 
 const MainLayout = () => {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -78,7 +79,7 @@ const MainLayout = () => {
     <div className="layout-container">
       <nav className="sidebar">
         <div className="sidebar-header">
-          Ventus App
+          <img src={logoImg} alt="Ventus App" className="sidebar-logo" />
         </div>
         <div className="sidebar-nav">
           <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
