@@ -8,46 +8,9 @@ import {
   FileText, CheckCircle, Clock, DollarSign, Package, Medal,
   Edit2, Plus, RotateCcw, Trash2, User, Mail, ShieldCheck, X
 } from 'lucide-react';
+import { CINTURONES_DISPONIBLES, normalizarCinturon, getBeltClass } from '../utils/cinturones';
 import './AlumnoDetalle.css';
 import './Alumnos.css';
-
-// Lista de cinturones oficiales de Taekwondo ITF (Gup y Dan)
-const CINTURONES_DISPONIBLES = [
-  { nombre: 'Blanco (10º Gup)', cssClass: 'belt-blanco' },
-  { nombre: 'Blanco punta Amarilla (9º Gup)', cssClass: 'belt-blanco-amarillo' },
-  { nombre: 'Amarillo (8º Gup)', cssClass: 'belt-amarillo' },
-  { nombre: 'Amarillo punta Verde (7º Gup)', cssClass: 'belt-amarillo-verde' },
-  { nombre: 'Verde (6º Gup)', cssClass: 'belt-verde' },
-  { nombre: 'Verde punta Azul (5º Gup)', cssClass: 'belt-verde-azul' },
-  { nombre: 'Azul (4º Gup)', cssClass: 'belt-azul' },
-  { nombre: 'Azul punta Roja (3º Gup)', cssClass: 'belt-azul-rojo' },
-  { nombre: 'Rojo (2º Gup)', cssClass: 'belt-rojo' },
-  { nombre: 'Rojo punta Negra (1º Gup)', cssClass: 'belt-rojo-negro' },
-  { nombre: 'Negro 1º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 2º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 3º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 4º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 5º Dan', cssClass: 'belt-negro' },
-  { nombre: 'Negro 6º Dan', cssClass: 'belt-negro' }
-];
-
-
-const getBeltClass = (cinturon) => {
-  if (!cinturon) return 'belt-blanco';
-  const c = cinturon.toLowerCase();
-  if (c.includes('blanco') && (c.includes('amarill') || c.includes('9'))) return 'belt-blanco-amarillo';
-  if (c.includes('blanco')) return 'belt-blanco';
-  if (c.includes('amarill') && (c.includes('verd') || c.includes('7'))) return 'belt-amarillo-verde';
-  if (c.includes('amarill')) return 'belt-amarillo';
-  if (c.includes('verd') && (c.includes('azul') || c.includes('5'))) return 'belt-verde-azul';
-  if (c.includes('verd')) return 'belt-verde';
-  if (c.includes('azul') && (c.includes('roj') || c.includes('3'))) return 'belt-azul-rojo';
-  if (c.includes('azul')) return 'belt-azul';
-  if (c.includes('roj') && (c.includes('negr') || c.includes('1'))) return 'belt-rojo-negro';
-  if (c.includes('roj')) return 'belt-rojo';
-  if (c.includes('negr') || c.includes('dan')) return 'belt-negro';
-  return 'belt-blanco';
-};
 
 const AlumnoDetalle = () => {
   const { id } = useParams();
@@ -210,7 +173,7 @@ const AlumnoDetalle = () => {
       telefono: alumno.telefono || '',
       nTutor: alumno.nTutor || '',
       email: alumno.email || '',
-      cinturon: alumno.cinturon || 'Blanco (10º Gup)',
+      cinturon: normalizarCinturon(alumno.cinturon) || 'Blanco',
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
       observaciones: alumno.observaciones || '',
@@ -404,13 +367,13 @@ const AlumnoDetalle = () => {
             {/* Grado / Cinturón con selector rápido */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span className={`belt-tag ${beltClass}`}>
-                <Award size={16} /> {alumno.cinturon || 'Blanco (10º Gup)'}
+                <Award size={16} /> {normalizarCinturon(alumno.cinturon) || 'Blanco'}
               </span>
               <select
-                value={alumno.cinturon || 'Blanco (10º Gup)'}
+                value={normalizarCinturon(alumno.cinturon) || 'Blanco'}
                 onChange={(e) => handleCambioCinturon(e.target.value)}
                 style={{ width: 'auto', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
-                title="Cambiar grado/cinturón"
+                title="Cambiar cinturón"
               >
                 {CINTURONES_DISPONIBLES.map(c => (
                   <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
@@ -907,9 +870,9 @@ const AlumnoDetalle = () => {
             />
           </div>
           <div className="form-group">
-            <label>Cinturón / Grado (Taekwondo ITF)</label>
+            <label>Cinturón</label>
             <select
-              value={editFormData.cinturon || 'Blanco (10º Gup)'}
+              value={normalizarCinturon(editFormData.cinturon) || 'Blanco'}
               onChange={(e) => setEditFormData({ ...editFormData, cinturon: e.target.value })}
             >
               {CINTURONES_DISPONIBLES.map(c => (
@@ -1032,7 +995,7 @@ const AlumnoDetalle = () => {
                 value={pagoFormData.concepto}
                 onChange={(e) => setPagoFormData({ ...pagoFormData, concepto: e.target.value })}
                 required
-                placeholder={tipoNuevoPago === 'examen' ? 'Ej: Cinturón Naranja 6º Kyu' : 'Ej: Guantes 12oz, Espinilleras...'}
+                placeholder={tipoNuevoPago === 'examen' ? 'Ej: Cinturón Amarillo' : 'Ej: Guantes 12oz, Espinilleras...'}
               />
             </div>
           )}

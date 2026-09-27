@@ -4,26 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Alumno } from '../db/db';
 import Modal from '../components/ui/Modal';
 import { Plus, Edit2, Trash2, X, Eye, Award } from 'lucide-react';
+import { CINTURONES, normalizarCinturon } from '../utils/cinturones';
 import './Alumnos.css';
-
-const CINTURONES_ITF = [
-  'Blanco (10º Gup)',
-  'Blanco punta Amarilla (9º Gup)',
-  'Amarillo (8º Gup)',
-  'Amarillo punta Verde (7º Gup)',
-  'Verde (6º Gup)',
-  'Verde punta Azul (5º Gup)',
-  'Azul (4º Gup)',
-  'Azul punta Roja (3º Gup)',
-  'Rojo (2º Gup)',
-  'Rojo punta Negra (1º Gup)',
-  'Negro 1º Dan',
-  'Negro 2º Dan',
-  'Negro 3º Dan',
-  'Negro 4º Dan',
-  'Negro 5º Dan',
-  'Negro 6º Dan'
-];
 
 const Alumnos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,7 +14,7 @@ const Alumnos = () => {
   
   const [formData, setFormData] = useState({
     nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-    cinturon: 'Blanco (10º Gup)', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+    cinturon: 'Blanco', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
   });
 
   const gruposDisponibles = useLiveQuery(() => db.grupos.toArray());
@@ -100,7 +82,7 @@ const Alumnos = () => {
   const openNewModal = () => {
     setFormData({
       nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-      cinturon: 'Blanco (10º Gup)', estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+      cinturon: 'Blanco', estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
     });
     setEditingId(null);
     setIsModalOpen(true);
@@ -114,7 +96,7 @@ const Alumnos = () => {
       telefono: alumno.telefono || '',
       nTutor: alumno.nTutor || '',
       email: alumno.email || '',
-      cinturon: alumno.cinturon || 'Blanco (10º Gup)',
+      cinturon: normalizarCinturon(alumno.cinturon) || 'Blanco',
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
       observaciones: alumno.observaciones || '',
@@ -225,7 +207,7 @@ const Alumnos = () => {
                     </Link>
                     <br/>
                     <small className="text-muted">
-                      {alumno.telefono || 'Sin teléfono'} {alumno.cinturon ? `• ${alumno.cinturon}` : ''}
+                      {alumno.telefono || 'Sin teléfono'} {alumno.cinturon ? `• ${normalizarCinturon(alumno.cinturon)}` : ''}
                     </small>
                   </td>
                   <td>{alumno.infoGrupos}</td>
@@ -288,9 +270,9 @@ const Alumnos = () => {
             <input type="email" name="email" value={formData.email || ''} onChange={handleInputChange} />
           </div>
           <div className="form-group">
-            <label>Cinturón / Grado (Taekwondo ITF)</label>
-            <select name="cinturon" value={formData.cinturon || 'Blanco (10º Gup)'} onChange={handleInputChange}>
-              {CINTURONES_ITF.map(c => (
+            <label>Cinturón</label>
+            <select name="cinturon" value={normalizarCinturon(formData.cinturon) || 'Blanco'} onChange={handleInputChange}>
+              {CINTURONES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

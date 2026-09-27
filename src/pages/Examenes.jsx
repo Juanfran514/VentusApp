@@ -229,7 +229,7 @@ const Examenes = () => {
           </div>
           <div className="form-group full-width">
             <label>Concepto / Grado *</label>
-            <input type="text" name="concepto" value={formData.concepto} onChange={handleInputChange} required placeholder="Ej: Cinturón Amarillo 8º Kyu" />
+            <input type="text" name="concepto" value={formData.concepto} onChange={handleInputChange} required placeholder="Ej: Cinturón Amarillo" />
           </div>
           <div className="form-group">
             <label>Fecha del Examen *</label>

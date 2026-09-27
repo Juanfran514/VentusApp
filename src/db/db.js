@@ -79,7 +79,7 @@ export class Pago {
     this.año = año;
     this.importe = importe;
     this.fecha = fecha;
-    this.concepto = concepto; // ej: "Cinturón blanco", "Examen 1º Dan"
+    this.concepto = concepto; // ej: "Cinturón Blanco", "Examen Cinturón Negro"
     this.estado = estado; // 'pagado' o 'pendiente'
   }
 }

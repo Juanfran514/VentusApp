@@ -141,6 +141,11 @@
   color: #854d0e;
 }
 
+.belt-amarillo-verde {
+  background: linear-gradient(90deg, #facc15 50%, #22c55e 50%);
+  color: #1e3a1e;
+}
+
 .belt-amarillo-naranja {
   background: linear-gradient(90deg, #facc15 50%, #fb923c 50%);
   color: #431407;
@@ -171,6 +176,11 @@
   color: #ffffff;
 }
 
+.belt-azul-rojo {
+  background: linear-gradient(90deg, #3b82f6 50%, #ef4444 50%);
+  color: #ffffff;
+}
+
 .belt-azul-marron {
   background: linear-gradient(90deg, #3b82f6 50%, #92400e 50%);
   color: #ffffff;
@@ -178,6 +188,16 @@
 
 .belt-marron {
   background-color: #92400e;
+  color: #ffffff;
+}
+
+.belt-rojo {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.belt-rojo-negro {
+  background: linear-gradient(90deg, #ef4444 50%, #0f172a 50%);
   color: #ffffff;
 }
 
