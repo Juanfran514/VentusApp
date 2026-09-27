@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Gasto } from '../db/db';
+import { gastoService } from '../services/gastoService';
 import Modal from '../components/ui/Modal';
-import { Plus, Trash2, FilterX } from 'lucide-react';
-import { DEFAULT_CATEGORIAS_GASTOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
-import '../pages/Alumnos.css'; 
+import SearchFilterBar from '../components/common/SearchFilterBar';
+import { Plus, Trash2 } from 'lucide-react';
+import { DEFAULT_CATEGORIAS_GASTOS, getStoredCategorias, mergeCategorias } from '../utils/categorias';
+import { formatCurrency, formatDate } from '../utils/formatters';
+import '../pages/Alumnos.css';
 
 const Gastos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
-  
+
   const [formData, setFormData] = useState({
     concepto: '',
     categoria: '',
@@ -17,8 +20,8 @@ const Gastos = () => {
     fecha: new Date().toISOString().split('T')[0]
   });
 
-  // Obtenemos los gastos de la BD ordenados por fecha
-  const gastos = useLiveQuery(() => db.gastos.orderBy('fecha').reverse().toArray());
+  // Obtenemos los gastos usando el servicio
+  const gastos = useLiveQuery(() => gastoService.getAll());
 
   // Extraemos las categorías combinando las guardadas en localStorage con las de la BD
   const categoriasSugeridas = useMemo(() => {
@@ -26,12 +29,15 @@ const Gastos = () => {
     return mergeCategorias(stored, gastos, 'categoria');
   }, [gastos]);
 
-  // Aplicar el filtro de categoría seleccionada
+  // Aplicar filtros de texto y categoría
   const gastosFiltrados = useMemo(() => {
     if (!gastos) return [];
-    if (!filtroCategoria) return gastos;
-    return gastos.filter(g => g.categoria === filtroCategoria);
-  }, [gastos, filtroCategoria]);
+    return gastos.filter(g => {
+      const matchCategoria = !filtroCategoria || g.categoria === filtroCategoria;
+      const matchBusqueda = !busqueda || (g.concepto || '').toLowerCase().includes(busqueda.toLowerCase());
+      return matchCategoria && matchBusqueda;
+    });
+  }, [gastos, filtroCategoria, busqueda]);
 
   const openModal = () => {
     setFormData({
@@ -45,24 +51,16 @@ const Gastos = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: name === 'importe' ? (value ? Number(value) : '') : value 
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'importe' ? (value ? Number(value) : '') : value
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const catTrimmed = formData.categoria.trim();
-      await db.gastos.add(new Gasto({
-        concepto: formData.concepto.trim(),
-        categoria: catTrimmed, 
-        importe: Number(formData.importe),
-        fecha: new Date(formData.fecha).toISOString()
-      }));
-      // Guardar para que persista para siempre
-      saveStoredCategoria('gastos', catTrimmed, DEFAULT_CATEGORIAS_GASTOS);
+      await gastoService.create(formData);
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error al guardar el gasto:", error);
@@ -72,7 +70,7 @@ const Gastos = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este registro de gasto?')) {
-      await db.gastos.delete(id);
+      await gastoService.delete(id);
     }
   };
 
@@ -87,31 +85,16 @@ const Gastos = () => {
       </div>
 
       <div className="card">
-        {/* Barra de filtros */}
-        <div className="filters" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <select 
-            value={filtroCategoria} 
-            onChange={(e) => setFiltroCategoria(e.target.value)}
-            style={{ minWidth: '220px', width: 'auto' }}
-          >
-            <option value="">Todas las categorías</option>
-            {categoriasSugeridas.map((cat, idx) => (
-              <option key={idx} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          {filtroCategoria && (
-            <button 
-              className="btn-secondary flex-center" 
-              onClick={() => setFiltroCategoria('')}
-              style={{ padding: '8px 15px' }}
-              title="Limpiar filtro"
-            >
-              <FilterX size={18} style={{ marginRight: '6px' }} />
-              Limpiar
-            </button>
-          )}
-        </div>
+        {/* Barra de búsqueda y filtro */}
+        <SearchFilterBar
+          search={busqueda}
+          onSearchChange={setBusqueda}
+          searchPlaceholder="Buscar por concepto..."
+          filterValue={filtroCategoria}
+          onFilterChange={setFiltroCategoria}
+          filterOptions={categoriasSugeridas}
+          filterPlaceholder="Todas las categorías"
+        />
 
         <div className="table-container">
           <table>
@@ -127,14 +110,16 @@ const Gastos = () => {
             <tbody>
               {gastosFiltrados.map(gasto => (
                 <tr key={gasto.id}>
-                  <td>{new Date(gasto.fecha).toLocaleDateString()}</td>
+                  <td>{formatDate(gasto.fecha)}</td>
                   <td><strong>{gasto.concepto}</strong></td>
                   <td>
                     <span className="badge flex-center" style={{ width: 'fit-content', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                       {gasto.categoria}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--danger-color, #ef4444)', fontWeight: 'bold' }}>-{gasto.importe} €</td>
+                  <td style={{ color: 'var(--danger-color, #ef4444)', fontWeight: 'bold' }}>
+                    -{formatCurrency(gasto.importe)}
+                  </td>
                   <td>
                     <button className="btn-icon text-danger" title="Eliminar gasto" onClick={() => handleDelete(gasto.id)}>
                       <Trash2 size={18} />
@@ -144,7 +129,7 @@ const Gastos = () => {
               ))}
               {gastosFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="text-center">No hay gastos que coincidan con el filtro.</td>
+                  <td colSpan="5" className="text-center">No hay gastos que coincidan con la búsqueda.</td>
                 </tr>
               )}
             </tbody>

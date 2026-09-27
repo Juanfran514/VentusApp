@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Grupo } from '../db/db';
+import { grupoService } from '../services/grupoService';
+import { alumnoService } from '../services/alumnoService';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, X, Users, FilterX } from 'lucide-react';
+import SearchFilterBar from '../components/common/SearchFilterBar';
+import { Plus, Edit2, Trash2, X, Users } from 'lucide-react';
 import { DEFAULT_CATEGORIAS_GRUPOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
-import '../pages/Alumnos.css'; // Reusing Alumnos CSS since it has the table and modal styles
+import { getNombreCompleto } from '../utils/formatters';
+import '../pages/Alumnos.css';
 
 const Grupos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,59 +17,37 @@ const Grupos = () => {
   const [search, setSearch] = useState('');
   const [filtroActividad, setFiltroActividad] = useState('');
   const [editingId, setEditingId] = useState(null);
-  
-  // tarifas form data will be an array of objects to make it easier to manage dynamically
-  // e.g. [{ dias: 1, importe: 30 }, { dias: 2, importe: 45 }]
+
   const [formData, setFormData] = useState({
     nombre: '',
     actividad: '',
     horariosArray: [],
-    plazasMax: 0,
-    tarifasArray: [] 
+    plazasMax: 20,
+    tarifasArray: []
   });
 
-  const alumnosTotales = useLiveQuery(() => db.alumnos.toArray());
+  const alumnosTotales = useLiveQuery(() => alumnoService.getAll()) || [];
+  const gruposRaw = useLiveQuery(() => grupoService.getAll()) || [];
 
-  const grupos = useLiveQuery(
-    async () => {
-      let results = [];
-      if (search) {
-        results = await db.grupos
-          .filter(g => (g.nombre + ' ' + g.actividad).toLowerCase().includes(search.toLowerCase()))
-          .toArray();
-      } else {
-        results = await db.grupos.toArray();
-      }
-
-      if (filtroActividad) {
-        results = results.filter(g => g.actividad === filtroActividad);
-      }
-
-      // Calculate Plazas Ocupadas based on active students
-      if (alumnosTotales) {
-        results.forEach(grupo => {
-          let ocupadas = 0;
-          alumnosTotales.forEach(a => {
-            if (a.estado === 'activo' && a.inscripciones) {
-              if (a.inscripciones.some(ins => Number(ins.grupoId) === grupo.id)) {
-                ocupadas++;
-              }
-            }
-          });
-          grupo.plazasOcupadas = ocupadas;
-        });
-      }
-
-      return results;
-    },
-    [search, filtroActividad, alumnosTotales]
-  );
+  // Calcular ocupación de plazas mediante el servicio de grupos
+  const gruposConOcupacion = useMemo(() => {
+    return grupoService.calcularOcupacion(gruposRaw, alumnosTotales);
+  }, [gruposRaw, alumnosTotales]);
 
   // Categorías/actividades sugeridas persistentes combinadas con las existentes en la BD
   const actividadesSugeridas = useMemo(() => {
     const stored = getStoredCategorias('grupos', DEFAULT_CATEGORIAS_GRUPOS);
-    return mergeCategorias(stored, grupos, 'actividad');
-  }, [grupos]);
+    return mergeCategorias(stored, gruposRaw, 'actividad');
+  }, [gruposRaw]);
+
+  // Filtrado reactivo por texto y categoría de actividad
+  const gruposFiltrados = useMemo(() => {
+    return gruposConOcupacion.filter(g => {
+      const matchSearch = !search || `${g.nombre || ''} ${g.actividad || ''}`.toLowerCase().includes(search.toLowerCase());
+      const matchActividad = !filtroActividad || g.actividad === filtroActividad;
+      return matchSearch && matchActividad;
+    });
+  }, [gruposConOcupacion, search, filtroActividad]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -132,18 +113,17 @@ const Grupos = () => {
   };
 
   const openEditModal = (grupo) => {
-    // Convert the tarifas object { "1": 30, "2": 45 } to an array for the form
     const tarifasArray = [];
     if (grupo.tarifas) {
       for (const [dias, importe] of Object.entries(grupo.tarifas)) {
         tarifasArray.push({ dias: Number(dias), importe: Number(importe) });
       }
     }
-    
+
     setFormData({
       nombre: grupo.nombre || '',
       actividad: grupo.actividad || '',
-      horariosArray: Array.isArray(grupo.horarios) ? grupo.horarios : [], // Soporte para strings antiguos
+      horariosArray: Array.isArray(grupo.horarios) ? grupo.horarios : [],
       plazasMax: grupo.plazasMax || 0,
       tarifasArray: tarifasArray
     });
@@ -159,7 +139,6 @@ const Grupos = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Transform tarifasArray back to object map { "1": 30, "2": 45 }
       const tarifasMap = {};
       formData.tarifasArray.forEach(t => {
         if (t.dias > 0 && t.importe >= 0) {
@@ -171,18 +150,17 @@ const Grupos = () => {
       const grupoData = {
         nombre: formData.nombre.trim(),
         actividad: actividadTrimmed,
-        horarios: formData.horariosArray, // Guardamos el array directamente
+        horarios: formData.horariosArray,
         plazasMax: Number(formData.plazasMax),
         tarifas: tarifasMap
       };
 
       if (editingId) {
-        await db.grupos.update(editingId, grupoData);
+        await grupoService.update(editingId, grupoData);
       } else {
-        await db.grupos.add(new Grupo(grupoData));
+        await grupoService.create(grupoData);
       }
 
-      // Guardar categoría/actividad para que persista para siempre
       saveStoredCategoria('grupos', actividadTrimmed, DEFAULT_CATEGORIAS_GRUPOS);
       setIsModalOpen(false);
     } catch (error) {
@@ -192,39 +170,12 @@ const Grupos = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('¿Estás seguro de que deseas eliminar este grupo? Se desinscribirá automáticamente a todos los alumnos que estén en él.')) {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este grupo? Se desinscribirá automáticamente a todos los alumnos que estén en él.')) {
       try {
-        // Cascade delete: remove this group from all students
-        const allAlumnos = await db.alumnos.toArray();
-        for (const alumno of allAlumnos) {
-          if (alumno.inscripciones && alumno.inscripciones.some(ins => Number(ins.grupoId) === id)) {
-            // Remove the inscription
-            const updatedInscripciones = alumno.inscripciones.filter(ins => Number(ins.grupoId) !== id);
-            
-            // Recalculate fee based on the remaining groups
-            const gruposDb = await db.grupos.toArray();
-            let newCuota = 0;
-            updatedInscripciones.forEach(ins => {
-              const g = gruposDb.find(gr => gr.id === Number(ins.grupoId));
-              if (g && g.tarifas) {
-                newCuota += Number(g.tarifas[ins.dias] || 0);
-              }
-            });
-
-            const updatedGruposIds = updatedInscripciones.map(ins => Number(ins.grupoId));
-
-            await db.alumnos.update(alumno.id, {
-              inscripciones: updatedInscripciones,
-              grupos: updatedGruposIds,
-              cuota: newCuota
-            });
-          }
-        }
-        
-        // Finally, delete the group
-        await db.grupos.delete(id);
+        await grupoService.delete(id);
       } catch (error) {
-         console.error("Error eliminando", error);
+        console.error("Error eliminando grupo", error);
+        alert("Hubo un error al eliminar el grupo.");
       }
     }
   };
@@ -240,38 +191,16 @@ const Grupos = () => {
       </div>
 
       <div className="card">
-        {/* Barra de búsqueda y filtro por categoría/actividad */}
-        <div className="filters" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input 
-            type="text" 
-            placeholder="Buscar grupo por nombre o actividad..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-            style={{ minWidth: '240px', flex: 1, marginBottom: 0 }}
-          />
-          <select 
-            value={filtroActividad} 
-            onChange={(e) => setFiltroActividad(e.target.value)}
-            style={{ minWidth: '200px', width: 'auto' }}
-          >
-            <option value="">Todas las actividades</option>
-            {actividadesSugeridas.map((act, idx) => (
-              <option key={idx} value={act}>{act}</option>
-            ))}
-          </select>
-          {filtroActividad && (
-            <button 
-              className="btn-secondary flex-center" 
-              onClick={() => setFiltroActividad('')}
-              style={{ padding: '8px 15px' }}
-              title="Limpiar filtro"
-            >
-              <FilterX size={18} style={{ marginRight: '6px' }} />
-              Limpiar
-            </button>
-          )}
-        </div>
+        {/* Barra de búsqueda y filtro unificada */}
+        <SearchFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar grupo por nombre o actividad..."
+          filterValue={filtroActividad}
+          onFilterChange={setFiltroActividad}
+          filterOptions={actividadesSugeridas}
+          filterPlaceholder="Todas las actividades"
+        />
 
         <div className="table-container">
           <table>
@@ -285,13 +214,17 @@ const Grupos = () => {
               </tr>
             </thead>
             <tbody>
-              {grupos?.map(grupo => (
+              {gruposFiltrados.map(grupo => (
                 <tr key={grupo.id}>
                   <td><strong>{grupo.nombre}</strong></td>
                   <td>{grupo.actividad}</td>
                   <td>
-                    {Array.isArray(grupo.horarios) 
-                      ? grupo.horarios.map((h, i) => <div key={i} style={{fontSize: '0.85em'}}>{h.dia.substring(0,3)} {h.horaInicio}-{h.horaFin}</div>)
+                    {Array.isArray(grupo.horarios)
+                      ? grupo.horarios.map((h, i) => (
+                          <div key={i} style={{ fontSize: '0.85em' }}>
+                            {h.dia.substring(0, 3)} {h.horaInicio}-{h.horaFin}
+                          </div>
+                        ))
                       : grupo.horarios}
                   </td>
                   <td>
@@ -312,7 +245,7 @@ const Grupos = () => {
                   </td>
                 </tr>
               ))}
-              {grupos?.length === 0 && (
+              {gruposFiltrados.length === 0 && (
                 <tr>
                   <td colSpan="5" className="text-center">No se encontraron grupos.</td>
                 </tr>
@@ -364,7 +297,7 @@ const Grupos = () => {
                     <option value="Domingo">Domingo</option>
                   </select>
                   
-                  <div className="dias-input" style={{marginLeft: '15px'}}>
+                  <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Inicio:</span>
                     <input 
                       type="time" 
@@ -373,7 +306,7 @@ const Grupos = () => {
                       required
                     />
                   </div>
-                  <div className="dias-input" style={{marginLeft: '15px'}}>
+                  <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Fin:</span>
                     <input 
                       type="time" 
@@ -413,7 +346,7 @@ const Grupos = () => {
                       required
                     />
                   </div>
-                  <div className="dias-input" style={{marginLeft: '15px'}}>
+                  <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Precio (€):</span>
                     <input 
                       type="number" 
@@ -444,9 +377,9 @@ const Grupos = () => {
       </Modal>
 
       {/* Modal Lista de Alumnos */}
-      <Modal isOpen={isListaModalOpen} onClose={() => setIsListaModalOpen(false)} title={`Alumnos en: ${selectedGroupForLista?.nombre}`}>
-        <div className="table-container" style={{maxHeight: '400px', overflowY: 'auto'}}>
-          <table style={{marginBottom: 0}}>
+      <Modal isOpen={isListaModalOpen} onClose={() => setIsListaModalOpen(false)} title={`Alumnos en: ${selectedGroupForLista?.nombre || ''}`}>
+        <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <table style={{ marginBottom: 0 }}>
             <thead>
               <tr>
                 <th>Nombre</th>
@@ -455,17 +388,17 @@ const Grupos = () => {
               </tr>
             </thead>
             <tbody>
-              {alumnosTotales?.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).map(alumno => {
+              {alumnosTotales.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).map(alumno => {
                 const ins = alumno.inscripciones.find(i => Number(i.grupoId) === selectedGroupForLista.id);
                 return (
                   <tr key={alumno.id}>
-                    <td><strong>{alumno.nombre} {alumno.apellidos}</strong></td>
+                    <td><strong>{getNombreCompleto(alumno)}</strong></td>
                     <td>{ins?.dias} días/sem</td>
                     <td>{alumno.telefono || '-'}</td>
                   </tr>
                 );
               })}
-              {alumnosTotales?.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).length === 0 && (
+              {alumnosTotales.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).length === 0 && (
                 <tr>
                   <td colSpan="3" className="text-center">No hay alumnos activos inscritos en este grupo.</td>
                 </tr>
@@ -473,7 +406,7 @@ const Grupos = () => {
             </tbody>
           </table>
         </div>
-        <div className="form-actions full-width" style={{marginTop: '15px'}}>
+        <div className="form-actions full-width" style={{ marginTop: '15px' }}>
           <button type="button" className="btn-primary" onClick={() => setIsListaModalOpen(false)}>Cerrar</button>
         </div>
       </Modal>

@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Pago } from '../db/db';
+import { alumnoService, pagoService } from '../services';
+import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import Modal from '../components/ui/Modal';
-import { Plus, Trash2, CheckCircle, Clock, RotateCcw } from 'lucide-react';
-import '../pages/Alumnos.css'; 
+import StatusBadge from '../components/common/StatusBadge';
+import SearchFilterBar from '../components/common/SearchFilterBar';
+import { Plus, Trash2, RotateCcw } from 'lucide-react';
+import '../pages/Alumnos.css';
 
 const Examenes = () => {
   const currentDate = new Date();
   const [activeTab, setActiveTab] = useState('pendientes');
   const [search, setSearch] = useState('');
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     alumnoId: '',
@@ -18,34 +21,16 @@ const Examenes = () => {
     fecha: currentDate.toISOString().split('T')[0]
   });
 
-  const alumnos = useLiveQuery(() => db.alumnos.toArray());
-  const examenes = useLiveQuery(() => db.pagos.where('tipo').equals('examen').toArray());
+  // Consultas delegadas a la capa de servicios (DIP)
+  const alumnos = useLiveQuery(() => alumnoService.getAll(), []);
+  const examenes = useLiveQuery(() => pagoService.getByTipo('examen'), []);
 
-  const alumnosMap = useMemo(() => {
-    if (!alumnos) return {};
-    return alumnos.reduce((acc, al) => {
-      acc[al.id] = al;
-      return acc;
-    }, {});
-  }, [alumnos]);
+  // Mapa de alumnos mediante el servicio (DRY)
+  const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
+  // Lógica de filtrado delegada al servicio de pagos (SRP)
   const { pendientes, pagados } = useMemo(() => {
-    if (!examenes) return { pendientes: [], pagados: [] };
-    
-    let filtered = examenes;
-    if (search) {
-      filtered = examenes.filter(p => {
-        const al = alumnosMap[p.alumnoId];
-        if (!al) return false;
-        return (al.nombre + ' ' + al.apellidos).toLowerCase().includes(search.toLowerCase()) || 
-               (p.concepto || '').toLowerCase().includes(search.toLowerCase());
-      });
-    }
-
-    const pendientesList = filtered.filter(p => p.estado === 'pendiente').sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-    const pagadosList = filtered.filter(p => p.estado === 'pagado').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-
-    return { pendientes: pendientesList, pagados: pagadosList };
+    return pagoService.separarPendientesYPagados(examenes, alumnosMap, search);
   }, [examenes, alumnosMap, search]);
 
   const openModal = () => {
@@ -60,44 +45,44 @@ const Examenes = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'importe' || name === 'alumnoId' ? (value ? Number(value) : '') : value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'importe' || name === 'alumnoId' ? (value ? Number(value) : '') : value
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.alumnoId) {
-      alert("Debes seleccionar un alumno");
+      alert('Debes seleccionar un alumno');
       return;
     }
-    
+
     try {
-      await db.pagos.add(new Pago({
-        alumnoId: formData.alumnoId,
+      await pagoService.create({
+        ...formData,
         tipo: 'examen',
-        importe: formData.importe,
-        fecha: new Date(formData.fecha).toISOString(),
-        concepto: formData.concepto,
         estado: 'pendiente' // Se crea como deuda
-      }));
+      });
       setIsModalOpen(false);
     } catch (error) {
-      console.error("Error asignando examen", error);
+      console.error('Error asignando examen:', error);
     }
   };
 
   const handleMarcarPagado = async (id) => {
-    await db.pagos.update(id, { estado: 'pagado' });
+    await pagoService.marcarPagado(id);
   };
 
   const handleRevertirPago = async (id) => {
-    if(window.confirm('¿Deshacer el pago y volver a marcarlo como pendiente?')) {
-      await db.pagos.update(id, { estado: 'pendiente' });
+    if (window.confirm('¿Deshacer el pago y volver a marcarlo como pendiente?')) {
+      await pagoService.revertirPago(id);
     }
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('¿Eliminar este registro?')) {
-      await db.pagos.delete(id);
+    if (window.confirm('¿Eliminar este registro?')) {
+      await pagoService.delete(id);
     }
   };
 
@@ -116,28 +101,42 @@ const Examenes = () => {
           <button 
             className={`tab-btn ${activeTab === 'pendientes' ? 'active' : ''}`}
             onClick={() => setActiveTab('pendientes')}
-            style={{ background: 'none', border: 'none', fontSize: '1.1em', cursor: 'pointer', color: activeTab === 'pendientes' ? 'var(--primary-color)' : 'var(--text-color)', fontWeight: activeTab === 'pendientes' ? 'bold' : 'normal', borderBottom: activeTab === 'pendientes' ? '2px solid var(--primary-color)' : 'none', padding: '5px 10px' }}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              fontSize: '1.1em', 
+              cursor: 'pointer', 
+              color: activeTab === 'pendientes' ? 'var(--primary-color)' : 'var(--text-color)', 
+              fontWeight: activeTab === 'pendientes' ? 'bold' : 'normal', 
+              borderBottom: activeTab === 'pendientes' ? '2px solid var(--primary-color)' : 'none', 
+              padding: '5px 10px' 
+            }}
           >
             Pendientes de Cobro
           </button>
           <button 
             className={`tab-btn ${activeTab === 'pagados' ? 'active' : ''}`}
             onClick={() => setActiveTab('pagados')}
-            style={{ background: 'none', border: 'none', fontSize: '1.1em', cursor: 'pointer', color: activeTab === 'pagados' ? 'var(--primary-color)' : 'var(--text-color)', fontWeight: activeTab === 'pagados' ? 'bold' : 'normal', borderBottom: activeTab === 'pagados' ? '2px solid var(--primary-color)' : 'none', padding: '5px 10px' }}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              fontSize: '1.1em', 
+              cursor: 'pointer', 
+              color: activeTab === 'pagados' ? 'var(--primary-color)' : 'var(--text-color)', 
+              fontWeight: activeTab === 'pagados' ? 'bold' : 'normal', 
+              borderBottom: activeTab === 'pagados' ? '2px solid var(--primary-color)' : 'none', 
+              padding: '5px 10px' 
+            }}
           >
             Historial (Pagados)
           </button>
         </div>
 
-        <div className="filters" style={{ marginBottom: '20px' }}>
-          <input 
-            type="text" 
-            placeholder="Buscar por alumno o concepto..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
-        </div>
+        <SearchFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar por alumno o concepto..."
+        />
 
         {activeTab === 'pendientes' && (
           <div className="table-container">
@@ -155,11 +154,11 @@ const Examenes = () => {
               <tbody>
                 {pendientes.map(pago => (
                   <tr key={pago.id} style={{ background: 'rgba(239, 68, 68, 0.05)' }}>
-                    <td>{new Date(pago.fecha).toLocaleDateString()}</td>
-                    <td><strong>{alumnosMap[pago.alumnoId]?.nombre} {alumnosMap[pago.alumnoId]?.apellidos}</strong></td>
+                    <td>{formatDate(pago.fecha)}</td>
+                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                     <td>{pago.concepto}</td>
-                    <td>{pago.importe} €</td>
-                    <td><span className="badge badge-baja flex-center" style={{ width: 'fit-content' }}><Clock size={14} style={{marginRight:'4px'}}/> Pendiente</span></td>
+                    <td>{formatCurrency(pago.importe)}</td>
+                    <td><StatusBadge status={pago.estado} /></td>
                     <td>
                       <button className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.9em', marginRight: '8px' }} onClick={() => handleMarcarPagado(pago.id)}>
                         Cobrar
@@ -194,11 +193,11 @@ const Examenes = () => {
               <tbody>
                 {pagados.map(pago => (
                   <tr key={pago.id}>
-                    <td>{new Date(pago.fecha).toLocaleDateString()}</td>
-                    <td><strong>{alumnosMap[pago.alumnoId]?.nombre} {alumnosMap[pago.alumnoId]?.apellidos}</strong></td>
+                    <td>{formatDate(pago.fecha)}</td>
+                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                     <td>{pago.concepto}</td>
-                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{pago.importe} €</td>
-                    <td><span className="badge badge-activo flex-center" style={{ width: 'fit-content' }}><CheckCircle size={14} style={{marginRight:'4px'}}/> Pagado</span></td>
+                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
+                    <td><StatusBadge status={pago.estado} /></td>
                     <td>
                       <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
                         <RotateCcw size={18} />
@@ -224,7 +223,9 @@ const Examenes = () => {
             <label>Alumno *</label>
             <select name="alumnoId" value={formData.alumnoId} onChange={handleInputChange} required>
               <option value="">-- Seleccionar --</option>
-              {alumnos?.filter(a => a.estado === 'activo').map(al => <option key={al.id} value={al.id}>{al.nombre} {al.apellidos}</option>)}
+              {alumnos?.filter(a => a.estado === 'activo').map(al => (
+                <option key={al.id} value={al.id}>{getNombreCompleto(al)}</option>
+              ))}
             </select>
           </div>
           <div className="form-group full-width">

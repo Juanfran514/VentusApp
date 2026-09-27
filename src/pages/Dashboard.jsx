@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
+import { alumnoService } from '../services/alumnoService';
+import { pagoService } from '../services/pagoService';
+import { gastoService } from '../services/gastoService';
 import { Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { formatCurrency } from '../utils/formatters';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -9,9 +12,9 @@ import {
 import './Dashboard.css';
 
 const Dashboard = () => {
-  const alumnos = useLiveQuery(() => db.alumnos.toArray(), []);
-  const pagos = useLiveQuery(() => db.pagos.toArray(), []);
-  const gastos = useLiveQuery(() => db.gastos.toArray(), []);
+  const alumnos = useLiveQuery(() => alumnoService.getAll(), []) || [];
+  const pagos = useLiveQuery(() => pagoService.getAll(), []) || [];
+  const gastos = useLiveQuery(() => gastoService.getAll(), []) || [];
 
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -24,24 +27,21 @@ const Dashboard = () => {
     { value: 10, label: 'Octubre' }, { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' }
   ];
 
-  // Generamos años desde 2023 hasta el actual + 1
-  const años = Array.from(new Array(5), (val, index) => today.getFullYear() - 2 + index);
+  // Generamos años desde 2 años antes hasta 2 años después
+  const años = Array.from(new Array(5), (_, index) => today.getFullYear() - 2 + index);
 
   // KPIs
   const activeStudentsCount = useMemo(() => {
-    if (!alumnos) return 0;
     return alumnos.filter(a => a.estado === 'activo').length;
   }, [alumnos]);
 
   const currentMonthIncome = useMemo(() => {
-    if (!pagos) return 0;
     return pagos
-      .filter(p => p.mes === selectedMonth && p.año === selectedYear && p.estado === 'pagado')
+      .filter(p => Number(p.mes) === selectedMonth && Number(p.año) === selectedYear && p.estado === 'pagado')
       .reduce((sum, p) => sum + Number(p.importe), 0);
   }, [pagos, selectedMonth, selectedYear]);
 
   const currentMonthExpenses = useMemo(() => {
-    if (!gastos) return 0;
     return gastos
       .filter(g => {
         const date = new Date(g.fecha);
@@ -52,19 +52,22 @@ const Dashboard = () => {
 
   const netProfit = currentMonthIncome - currentMonthExpenses;
 
-  // Chart Data: Income vs Expenses over the year
+  // Flujo de Caja anual: Ingresos vs Gastos mes a mes
   const chartData = useMemo(() => {
     const data = [];
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
     for (let m = 1; m <= 12; m++) {
-      const incomeForMonth = pagos?.filter(p => p.mes === m && p.año === selectedYear && p.estado === 'pagado')
-                                  .reduce((sum, p) => sum + Number(p.importe), 0) || 0;
+      const incomeForMonth = pagos
+        .filter(p => Number(p.mes) === m && Number(p.año) === selectedYear && p.estado === 'pagado')
+        .reduce((sum, p) => sum + Number(p.importe), 0);
       
-      const expensesForMonth = gastos?.filter(g => {
-        const date = new Date(g.fecha);
-        return (date.getMonth() + 1) === m && date.getFullYear() === selectedYear;
-      }).reduce((sum, g) => sum + Number(g.importe), 0) || 0;
+      const expensesForMonth = gastos
+        .filter(g => {
+          const date = new Date(g.fecha);
+          return (date.getMonth() + 1) === m && date.getFullYear() === selectedYear;
+        })
+        .reduce((sum, g) => sum + Number(g.importe), 0);
 
       data.push({
         name: months[m - 1],
@@ -75,25 +78,9 @@ const Dashboard = () => {
     return data;
   }, [pagos, gastos, selectedYear]);
 
-  // Pie Chart Data: Expenses by Category for the current month
+  // Gastos por categoría para el mes seleccionado vía gastoService
   const expensesByCategory = useMemo(() => {
-    if (!gastos) return [];
-    
-    const currentMonthG = gastos.filter(g => {
-      const date = new Date(g.fecha);
-      return (date.getMonth() + 1) === selectedMonth && date.getFullYear() === selectedYear;
-    });
-
-    const categoryMap = {};
-    currentMonthG.forEach(g => {
-      const cat = g.categoria || 'Otros';
-      categoryMap[cat] = (categoryMap[cat] || 0) + Number(g.importe);
-    });
-
-    return Object.keys(categoryMap).map(key => ({
-      name: key,
-      value: categoryMap[key]
-    })).sort((a, b) => b.value - a.value);
+    return gastoService.agruparPorCategoria(gastos, selectedMonth, selectedYear);
   }, [gastos, selectedMonth, selectedYear]);
 
   const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#8b5cf6'];
@@ -135,14 +122,14 @@ const Dashboard = () => {
           <div className="kpi-title">
             <TrendingUp size={16} /> Ingresos (Mes)
           </div>
-          <div className="kpi-value positive">{currentMonthIncome.toFixed(2)} €</div>
+          <div className="kpi-value positive">{formatCurrency(currentMonthIncome)}</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-title">
             <TrendingDown size={16} /> Gastos (Mes)
           </div>
-          <div className="kpi-value negative">{currentMonthExpenses.toFixed(2)} €</div>
+          <div className="kpi-value negative">{formatCurrency(currentMonthExpenses)}</div>
         </div>
 
         <div className="kpi-card">
@@ -150,7 +137,7 @@ const Dashboard = () => {
             <DollarSign size={16} /> Beneficio Neto
           </div>
           <div className={`kpi-value ${netProfit >= 0 ? 'positive' : 'negative'}`}>
-            {netProfit.toFixed(2)} €
+            {formatCurrency(netProfit)}
           </div>
         </div>
       </div>
@@ -204,7 +191,7 @@ const Dashboard = () => {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {expensesByCategory.map((entry, index) => (
+                    {expensesByCategory.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

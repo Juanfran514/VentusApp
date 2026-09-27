@@ -1,45 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Alumno } from '../db/db';
+import { alumnoService } from '../services/alumnoService';
+import { grupoService } from '../services/grupoService';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, X, Eye, Award } from 'lucide-react';
+import StatusBadge from '../components/common/StatusBadge';
+import { Plus, Edit2, Trash2, X, Eye } from 'lucide-react';
 import { CINTURONES, normalizarCinturon } from '../utils/cinturones';
+import { formatCurrency, getNombreCompleto } from '../utils/formatters';
 import './Alumnos.css';
 
 const Alumnos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
     cinturon: 'Blanco', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
   });
 
-  const gruposDisponibles = useLiveQuery(() => db.grupos.toArray());
+  const gruposDisponibles = useLiveQuery(() => grupoService.getAll()) || [];
+
+  const gruposMap = useMemo(() => {
+    return gruposDisponibles.reduce((acc, g) => {
+      acc[g.id] = g;
+      return acc;
+    }, {});
+  }, [gruposDisponibles]);
 
   const alumnos = useLiveQuery(
     async () => {
-      let results = [];
-      if (search) {
-        results = await db.alumnos
-          .filter(a => (a.nombre + ' ' + a.apellidos).toLowerCase().includes(search.toLowerCase()))
-          .toArray();
-      } else {
-        results = await db.alumnos.toArray();
-      }
-
-      // Mapear grupos para mostrar información detallada
-      const gruposMap = {};
-      const allGroups = await db.grupos.toArray();
-      allGroups.forEach(g => gruposMap[g.id] = g.nombre);
+      const results = await alumnoService.getAll(search);
+      const allGroups = await grupoService.getAll();
+      const gMap = allGroups.reduce((acc, g) => { acc[g.id] = g.nombre; return acc; }, {});
 
       results.forEach(a => {
         if (a.inscripciones && a.inscripciones.length > 0) {
-          // Genera un string tipo: "Taekwondo (2 días), Kickboxing (3 días)"
           a.infoGrupos = a.inscripciones.map(ins => {
-            const nombre = gruposMap[ins.grupoId] || 'Grupo desconocido';
+            const nombre = gMap[ins.grupoId] || 'Grupo desconocido';
             return `${nombre} (${ins.dias} días)`;
           }).join(', ');
         } else {
@@ -106,45 +105,34 @@ const Alumnos = () => {
     setIsModalOpen(true);
   };
 
-  // Cálculo de cuota en tiempo real basado en grupos y días
-  const cuotaCalculada = formData.inscripciones.reduce((total, ins) => {
-    if (!ins.grupoId || !ins.dias) return total;
-    const grupo = gruposDisponibles?.find(g => g.id === Number(ins.grupoId));
-    if (grupo && grupo.tarifas) {
-      // Tomamos la tarifa por esos días. Si no existe exactamente, tomamos 0 por seguridad (hasta configurar bien el grupo)
-      const tarifa = grupo.tarifas[ins.dias] || 0;
-      return total + Number(tarifa);
-    }
-    return total;
-  }, 0);
+  // Cálculo de cuota en tiempo real basado en grupos y días mediante grupoService
+  const cuotaCalculada = useMemo(() => {
+    return grupoService.calcularCuotaTotal(formData.inscripciones, gruposMap);
+  }, [formData.inscripciones, gruposMap]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Filtrar inscripciones vacías o sin grupo seleccionado
-      const inscripcionesValidas = formData.inscripciones.filter(ins => ins.grupoId !== '');
-      
-      // Asegurarnos de guardar los tipos correctos (IDs numéricos si así lo usa Dexie)
-      const inscripcionesMapeadas = inscripcionesValidas.map(ins => ({
-        grupoId: Number(ins.grupoId),
-        dias: Number(ins.dias)
-      }));
+      const inscripcionesValidas = formData.inscripciones
+        .filter(ins => ins.grupoId !== '')
+        .map(ins => ({
+          grupoId: Number(ins.grupoId),
+          dias: Number(ins.dias)
+        }));
 
-      // Extraer el array de IDs para la propiedad "grupos" que usa el índice de Dexie para buscar rápido
-      const gruposIds = inscripcionesMapeadas.map(ins => ins.grupoId);
+      const gruposIds = inscripcionesValidas.map(ins => ins.grupoId);
 
       const alumnoData = {
         ...formData,
         cuota: cuotaCalculada,
-        inscripciones: inscripcionesMapeadas,
+        inscripciones: inscripcionesValidas,
         grupos: gruposIds
       };
 
       if (editingId) {
-        await db.alumnos.update(editingId, alumnoData);
+        await alumnoService.update(editingId, alumnoData);
       } else {
-        const nuevoAlumno = new Alumno(alumnoData);
-        await db.alumnos.add(nuevoAlumno);
+        await alumnoService.create(alumnoData);
       }
       setIsModalOpen(false);
     } catch (error) {
@@ -154,15 +142,14 @@ const Alumnos = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('¿Estás seguro de que deseas eliminar este alumno?')) {
-      await db.alumnos.delete(id);
+    if (window.confirm('¿Estás seguro de que deseas eliminar este alumno?')) {
+      await alumnoService.delete(id);
     }
   };
 
   const handleToggleEstado = async (alumno) => {
-    const nuevoEstado = alumno.estado === 'activo' ? 'baja' : 'activo';
     try {
-      await db.alumnos.update(alumno.id, { estado: nuevoEstado });
+      await alumnoService.toggleEstado(alumno);
     } catch (error) {
       console.error("Error cambiando estado", error);
     }
@@ -203,7 +190,7 @@ const Alumnos = () => {
                 <tr key={alumno.id}>
                   <td>
                     <Link to={`/alumnos/${alumno.id}`} style={{ color: 'inherit', textDecoration: 'none' }} title="Ver ficha del alumno">
-                      <strong style={{ color: 'var(--primary-color)' }}>{alumno.nombreCompleto}</strong>
+                      <strong style={{ color: 'var(--primary-color)' }}>{getNombreCompleto(alumno)}</strong>
                     </Link>
                     <br/>
                     <small className="text-muted">
@@ -211,22 +198,21 @@ const Alumnos = () => {
                     </small>
                   </td>
                   <td>{alumno.infoGrupos}</td>
-                  <td>{alumno.cuota} €</td>
+                  <td><strong>{formatCurrency(alumno.cuota)}</strong></td>
                   <td>
-                    <span 
-                      className={`badge badge-${alumno.estado}`}
+                    <StatusBadge
+                      status={alumno.estado}
                       onClick={() => handleToggleEstado(alumno)}
-                      style={{ cursor: 'pointer' }}
-                      title="Clic para cambiar estado"
-                    >
-                      {alumno.estado.toUpperCase()}
-                    </span>
+                      title="Clic para alternar estado"
+                    />
                   </td>
                   <td>
                     <Link to={`/alumnos/${alumno.id}`} className="btn-icon text-primary" title="Ver Ficha Detallada">
                       <Eye size={18} />
                     </Link>
-                    <button className="btn-icon text-muted" title="Editar" onClick={() => openEditModal(alumno)}><Edit2 size={18} /></button>
+                    <button className="btn-icon text-muted" title="Editar" onClick={() => openEditModal(alumno)}>
+                      <Edit2 size={18} />
+                    </button>
                     <button className="btn-icon text-danger" title="Eliminar" onClick={() => handleDelete(alumno.id)}>
                       <Trash2 size={18} />
                     </button>
@@ -328,7 +314,7 @@ const Alumnos = () => {
           <div className="form-group">
             <label>Cuota Mensual Automática (€)</label>
             <div className="cuota-display">
-              {cuotaCalculada} €
+              {formatCurrency(cuotaCalculada)}
             </div>
             <small className="text-muted">Se calcula según las tarifas de los grupos seleccionados.</small>
           </div>

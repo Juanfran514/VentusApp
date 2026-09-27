@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Pago } from '../db/db';
-import Modal from '../components/ui/Modal';
-import { Plus, Trash2, CheckCircle, Clock, RotateCcw, FilterX } from 'lucide-react';
+import { alumnoService, pagoService } from '../services';
+import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import { DEFAULT_CATEGORIAS_MATERIAL, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
-import '../pages/Alumnos.css'; 
+import Modal from '../components/ui/Modal';
+import StatusBadge from '../components/common/StatusBadge';
+import SearchFilterBar from '../components/common/SearchFilterBar';
+import { Plus, Trash2, RotateCcw } from 'lucide-react';
+import '../pages/Alumnos.css';
 
 const Equipamiento = () => {
   const currentDate = new Date();
   const [activeTab, setActiveTab] = useState('pendientes');
   const [search, setSearch] = useState('');
   const [filtroMaterial, setFiltroMaterial] = useState('');
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     alumnoId: '',
@@ -20,44 +23,25 @@ const Equipamiento = () => {
     fecha: currentDate.toISOString().split('T')[0]
   });
 
-  const alumnos = useLiveQuery(() => db.alumnos.toArray());
-  const equipamiento = useLiveQuery(() => db.pagos.where('tipo').equals('material').toArray());
+  // Consultas delegadas a servicios (DIP)
+  const alumnos = useLiveQuery(() => alumnoService.getAll(), []);
+  const equipamiento = useLiveQuery(() => pagoService.getByTipo('material'), []);
 
-  const alumnosMap = useMemo(() => {
-    if (!alumnos) return {};
-    return alumnos.reduce((acc, al) => {
-      acc[al.id] = al;
-      return acc;
-    }, {});
-  }, [alumnos]);
+  const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
-  // Materiales sugeridos persistentes combinados con los existentes en la BD
+  // Materiales sugeridos persistentes
   const materialesSugeridos = useMemo(() => {
     const stored = getStoredCategorias('material', DEFAULT_CATEGORIAS_MATERIAL);
     return mergeCategorias(stored, equipamiento, 'concepto');
   }, [equipamiento]);
 
+  // Filtrado delegado al servicio de pagos (SRP)
   const { pendientes, pagados } = useMemo(() => {
-    if (!equipamiento) return { pendientes: [], pagados: [] };
-    
-    let filtered = equipamiento;
-    if (search) {
-      filtered = equipamiento.filter(p => {
-        const al = alumnosMap[p.alumnoId];
-        if (!al) return false;
-        return (al.nombre + ' ' + al.apellidos).toLowerCase().includes(search.toLowerCase()) || 
-               (p.concepto || '').toLowerCase().includes(search.toLowerCase());
-      });
-    }
-
+    let baseList = equipamiento || [];
     if (filtroMaterial) {
-      filtered = filtered.filter(p => p.concepto === filtroMaterial);
+      baseList = baseList.filter(p => p.concepto === filtroMaterial);
     }
-
-    const pendientesList = filtered.filter(p => p.estado === 'pendiente').sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-    const pagadosList = filtered.filter(p => p.estado === 'pagado').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-
-    return { pendientes: pendientesList, pagados: pagadosList };
+    return pagoService.separarPendientesYPagados(baseList, alumnosMap, search);
   }, [equipamiento, alumnosMap, search, filtroMaterial]);
 
   const openModal = () => {
@@ -72,47 +56,48 @@ const Equipamiento = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'importe' || name === 'alumnoId' ? (value ? Number(value) : '') : value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'importe' || name === 'alumnoId' ? (value ? Number(value) : '') : value
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.alumnoId) {
-      alert("Debes seleccionar un alumno");
+      alert('Debes seleccionar un alumno');
       return;
     }
-    
+
     try {
       const conceptoTrimmed = formData.concepto.trim();
-      await db.pagos.add(new Pago({
-        alumnoId: formData.alumnoId,
-        tipo: 'material',
-        importe: formData.importe,
-        fecha: new Date(formData.fecha).toISOString(),
+      await pagoService.create({
+        ...formData,
         concepto: conceptoTrimmed,
+        tipo: 'material',
         estado: 'pendiente' // Se crea como deuda
-      }));
+      });
       // Guardar categoría/material para que persista para siempre
       saveStoredCategoria('material', conceptoTrimmed, DEFAULT_CATEGORIAS_MATERIAL);
       setIsModalOpen(false);
     } catch (error) {
-      console.error("Error asignando material", error);
+      console.error('Error asignando material:', error);
     }
   };
 
   const handleMarcarPagado = async (id) => {
-    await db.pagos.update(id, { estado: 'pagado' });
+    await pagoService.marcarPagado(id);
   };
 
   const handleRevertirPago = async (id) => {
-    if(window.confirm('¿Deshacer el cobro y volver a marcarlo como pendiente?')) {
-      await db.pagos.update(id, { estado: 'pendiente' });
+    if (window.confirm('¿Deshacer el cobro y volver a marcarlo como pendiente?')) {
+      await pagoService.revertirPago(id);
     }
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('¿Eliminar este registro?')) {
-      await db.pagos.delete(id);
+    if (window.confirm('¿Eliminar este registro?')) {
+      await pagoService.delete(id);
     }
   };
 
@@ -131,51 +116,46 @@ const Equipamiento = () => {
           <button 
             className={`tab-btn ${activeTab === 'pendientes' ? 'active' : ''}`}
             onClick={() => setActiveTab('pendientes')}
-            style={{ background: 'none', border: 'none', fontSize: '1.1em', cursor: 'pointer', color: activeTab === 'pendientes' ? 'var(--primary-color)' : 'var(--text-color)', fontWeight: activeTab === 'pendientes' ? 'bold' : 'normal', borderBottom: activeTab === 'pendientes' ? '2px solid var(--primary-color)' : 'none', padding: '5px 10px' }}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              fontSize: '1.1em', 
+              cursor: 'pointer', 
+              color: activeTab === 'pendientes' ? 'var(--primary-color)' : 'var(--text-color)', 
+              fontWeight: activeTab === 'pendientes' ? 'bold' : 'normal', 
+              borderBottom: activeTab === 'pendientes' ? '2px solid var(--primary-color)' : 'none', 
+              padding: '5px 10px' 
+            }}
           >
             Pendientes de Cobro
           </button>
           <button 
             className={`tab-btn ${activeTab === 'pagados' ? 'active' : ''}`}
             onClick={() => setActiveTab('pagados')}
-            style={{ background: 'none', border: 'none', fontSize: '1.1em', cursor: 'pointer', color: activeTab === 'pagados' ? 'var(--primary-color)' : 'var(--text-color)', fontWeight: activeTab === 'pagados' ? 'bold' : 'normal', borderBottom: activeTab === 'pagados' ? '2px solid var(--primary-color)' : 'none', padding: '5px 10px' }}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              fontSize: '1.1em', 
+              cursor: 'pointer', 
+              color: activeTab === 'pagados' ? 'var(--primary-color)' : 'var(--text-color)', 
+              fontWeight: activeTab === 'pagados' ? 'bold' : 'normal', 
+              borderBottom: activeTab === 'pagados' ? '2px solid var(--primary-color)' : 'none', 
+              padding: '5px 10px' 
+            }}
           >
             Historial (Pagados)
           </button>
         </div>
 
-        {/* Barra de búsqueda y filtro por categoría/material */}
-        <div className="filters" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input 
-            type="text" 
-            placeholder="Buscar por alumno o material..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-            style={{ minWidth: '240px', flex: 1, marginBottom: 0 }}
-          />
-          <select 
-            value={filtroMaterial} 
-            onChange={(e) => setFiltroMaterial(e.target.value)}
-            style={{ minWidth: '200px', width: 'auto' }}
-          >
-            <option value="">Todos los materiales</option>
-            {materialesSugeridos.map((mat, idx) => (
-              <option key={idx} value={mat}>{mat}</option>
-            ))}
-          </select>
-          {filtroMaterial && (
-            <button 
-              className="btn-secondary flex-center" 
-              onClick={() => setFiltroMaterial('')}
-              style={{ padding: '8px 15px' }}
-              title="Limpiar filtro"
-            >
-              <FilterX size={18} style={{ marginRight: '6px' }} />
-              Limpiar
-            </button>
-          )}
-        </div>
+        <SearchFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar por alumno o material..."
+          filterValue={filtroMaterial}
+          onFilterChange={setFiltroMaterial}
+          filterOptions={materialesSugeridos}
+          filterPlaceholder="Todos los materiales"
+        />
 
         {activeTab === 'pendientes' && (
           <div className="table-container">
@@ -193,11 +173,11 @@ const Equipamiento = () => {
               <tbody>
                 {pendientes.map(pago => (
                   <tr key={pago.id} style={{ background: 'rgba(239, 68, 68, 0.05)' }}>
-                    <td>{new Date(pago.fecha).toLocaleDateString()}</td>
-                    <td><strong>{alumnosMap[pago.alumnoId]?.nombre} {alumnosMap[pago.alumnoId]?.apellidos}</strong></td>
+                    <td>{formatDate(pago.fecha)}</td>
+                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                     <td>{pago.concepto}</td>
-                    <td>{pago.importe} €</td>
-                    <td><span className="badge badge-baja flex-center" style={{ width: 'fit-content' }}><Clock size={14} style={{marginRight:'4px'}}/> Pendiente</span></td>
+                    <td>{formatCurrency(pago.importe)}</td>
+                    <td><StatusBadge status={pago.estado} /></td>
                     <td>
                       <button className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.9em', marginRight: '8px' }} onClick={() => handleMarcarPagado(pago.id)}>
                         Cobrar
@@ -232,11 +212,11 @@ const Equipamiento = () => {
               <tbody>
                 {pagados.map(pago => (
                   <tr key={pago.id}>
-                    <td>{new Date(pago.fecha).toLocaleDateString()}</td>
-                    <td><strong>{alumnosMap[pago.alumnoId]?.nombre} {alumnosMap[pago.alumnoId]?.apellidos}</strong></td>
+                    <td>{formatDate(pago.fecha)}</td>
+                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                     <td>{pago.concepto}</td>
-                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{pago.importe} €</td>
-                    <td><span className="badge badge-activo flex-center" style={{ width: 'fit-content' }}><CheckCircle size={14} style={{marginRight:'4px'}}/> Pagado</span></td>
+                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
+                    <td><StatusBadge status={pago.estado} /></td>
                     <td>
                       <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
                         <RotateCcw size={18} />
@@ -262,7 +242,9 @@ const Equipamiento = () => {
             <label>Alumno *</label>
             <select name="alumnoId" value={formData.alumnoId} onChange={handleInputChange} required>
               <option value="">-- Seleccionar --</option>
-              {alumnos?.filter(a => a.estado === 'activo').map(al => <option key={al.id} value={al.id}>{al.nombre} {al.apellidos}</option>)}
+              {alumnos?.filter(a => a.estado === 'activo').map(al => (
+                <option key={al.id} value={al.id}>{getNombreCompleto(al)}</option>
+              ))}
             </select>
           </div>
           <div className="form-group full-width">
