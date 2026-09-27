@@ -21,6 +21,7 @@ const ModalEditAlumno = ({
     nTutor: '',
     email: '',
     cinturon: 'Blanco',
+    cuota: 0,
     estado: 'activo',
     inscripciones: [],
     observaciones: '',
@@ -37,6 +38,7 @@ const ModalEditAlumno = ({
         nTutor: alumno.nTutor || '',
         email: alumno.email || '',
         cinturon: normalizarCinturon(alumno.cinturon) || 'Blanco',
+        cuota: alumno.cuota !== undefined ? alumno.cuota : 0,
         estado: alumno.estado || 'activo',
         inscripciones: alumno.inscripciones || [],
         observaciones: alumno.observaciones || '',
@@ -47,7 +49,10 @@ const ModalEditAlumno = ({
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'cuota' ? (value ? Number(value) : '') : value
+    }));
   };
 
   const handleAddInscripcion = () => {
@@ -58,17 +63,31 @@ const ModalEditAlumno = ({
   };
 
   const handleRemoveInscripcion = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      inscripciones: prev.inscripciones.filter((_, i) => i !== index)
-    }));
+    setFormData(prev => {
+      const newInscripciones = prev.inscripciones.filter((_, i) => i !== index);
+      const prevCalc = grupoService.calcularCuotaTotal(prev.inscripciones, gruposMap);
+      const newCalc = grupoService.calcularCuotaTotal(newInscripciones, gruposMap);
+      const shouldAutoUpdate = prev.cuota === 0 || prev.cuota === '' || Number(prev.cuota) === Number(prevCalc);
+      return {
+        ...prev,
+        inscripciones: newInscripciones,
+        cuota: shouldAutoUpdate ? newCalc : prev.cuota
+      };
+    });
   };
 
   const handleInscripcionChange = (index, field, value) => {
     setFormData(prev => {
       const newIns = [...prev.inscripciones];
       newIns[index] = { ...newIns[index], [field]: value };
-      return { ...prev, inscripciones: newIns };
+      const prevCalc = grupoService.calcularCuotaTotal(prev.inscripciones, gruposMap);
+      const newCalc = grupoService.calcularCuotaTotal(newIns, gruposMap);
+      const shouldAutoUpdate = prev.cuota === 0 || prev.cuota === '' || Number(prev.cuota) === Number(prevCalc);
+      return {
+        ...prev,
+        inscripciones: newIns,
+        cuota: shouldAutoUpdate ? newCalc : prev.cuota
+      };
     });
   };
 
@@ -89,7 +108,7 @@ const ModalEditAlumno = ({
 
     onSave({
       ...formData,
-      cuota: cuotaCalculada,
+      cuota: Number(formData.cuota) || 0,
       inscripciones: inscripcionesValidas,
       grupos: gruposIds
     });
@@ -213,8 +232,38 @@ const ModalEditAlumno = ({
         </div>
 
         <div className="form-group">
-          <label>Cuota Mensual Resultante (€)</label>
-          <div className="cuota-display">{formatCurrency(cuotaCalculada)}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label style={{ margin: 0 }}>Cuota Mensual (€) *</label>
+            {Number(formData.cuota) !== Number(cuotaCalculada) && (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                onClick={() => setFormData(prev => ({ ...prev, cuota: cuotaCalculada }))}
+                title="Restablecer precio calculado según tarifas de grupo"
+              >
+                Usar tarifa estándar ({cuotaCalculada} €)
+              </button>
+            )}
+          </div>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            name="cuota"
+            value={formData.cuota}
+            onChange={handleInputChange}
+            required
+            placeholder="0.00"
+          />
+          <small className="text-muted" style={{ display: 'block', marginTop: '4px' }}>
+            Tarifa base por grupos: <strong>{formatCurrency(cuotaCalculada)}</strong>
+            {Number(formData.cuota) !== Number(cuotaCalculada) && (
+              <span style={{ color: 'var(--primary-color)', marginLeft: '6px', fontWeight: 600 }}>
+                (Precio personalizado)
+              </span>
+            )}
+          </small>
         </div>
 
         <div className="form-group full-width">

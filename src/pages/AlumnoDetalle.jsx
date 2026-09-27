@@ -11,6 +11,7 @@ import AlumnoGruposTab from '../components/alumno/AlumnoGruposTab';
 import AlumnoSaludTab from '../components/alumno/AlumnoSaludTab';
 import ModalPagoAlumno from '../components/alumno/ModalPagoAlumno';
 import ModalEditAlumno from '../components/alumno/ModalEditAlumno';
+import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/common/StatusBadge';
 import {
   ArrowLeft, Calendar, AlertTriangle,
@@ -36,6 +37,8 @@ const AlumnoDetalle = () => {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
+  const [isCuotaModalOpen, setIsCuotaModalOpen] = useState(false);
+  const [cuotaRapidaInput, setCuotaRapidaInput] = useState('');
   const [tipoNuevoPago, setTipoNuevoPago] = useState('cuota');
 
   const currentDate = useMemo(() => new Date(), []);
@@ -72,6 +75,11 @@ const AlumnoDetalle = () => {
   const edadCalculada = useMemo(() => {
     return calculateAge(alumno?.fechaNac);
   }, [alumno?.fechaNac]);
+
+  // Tarifa estándar sugerida según grupos inscritos
+  const cuotaSugeridaGrupos = useMemo(() => {
+    return grupoService.calcularCuotaTotal(alumno?.inscripciones || [], gruposMap);
+  }, [alumno?.inscripciones, gruposMap]);
 
   // Cuota del mes actual pagada o pendiente
   const estadoCuotaMesActual = useMemo(() => {
@@ -159,7 +167,7 @@ const AlumnoDetalle = () => {
     }
   };
 
-  // Guardar edición del alumno
+  // Guardar edición completa del alumno
   const handleSaveEdit = async (updatedData) => {
     try {
       await alumnoService.update(alumno.id, updatedData);
@@ -167,6 +175,20 @@ const AlumnoDetalle = () => {
     } catch (error) {
       console.error('Error guardando cambios del alumno', error);
       alert('Hubo un error al guardar los cambios.');
+    }
+  };
+
+  // Guardar modificación directa de cuota
+  const handleSaveCuotaRapida = async (e) => {
+    e.preventDefault();
+    try {
+      await alumnoService.update(alumno.id, {
+        cuota: Number(cuotaRapidaInput) || 0
+      });
+      setIsCuotaModalOpen(false);
+    } catch (err) {
+      console.error('Error guardando cuota:', err);
+      alert('Hubo un error al guardar la cuota.');
     }
   };
 
@@ -255,6 +277,10 @@ const AlumnoDetalle = () => {
         totalPagado={totalPagado}
         totalCobrosCount={pagosAlumno.filter(p => p.estado === 'pagado').length}
         currentMonthName={MESES_NOMBRES[currentDate.getMonth()]}
+        onEditarCuota={() => {
+          setCuotaRapidaInput(alumno.cuota !== undefined ? alumno.cuota : cuotaSugeridaGrupos);
+          setIsCuotaModalOpen(true);
+        }}
       />
 
       {/* Navegación por Pestañas */}
@@ -385,6 +411,59 @@ const AlumnoDetalle = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL RÁPIDO PARA MODIFICAR PRECIO DE CUOTA */}
+      <Modal
+        isOpen={isCuotaModalOpen}
+        onClose={() => setIsCuotaModalOpen(false)}
+        title={`Modificar Cuota Mensual: ${alumno.nombreCompleto}`}
+      >
+        <form onSubmit={handleSaveCuotaRapida} className="form-grid">
+          <div className="form-group full-width">
+            <label>Cuota Mensual Acordada (€) *</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={cuotaRapidaInput}
+              onChange={(e) => setCuotaRapidaInput(e.target.value)}
+              required
+              placeholder="0.00"
+              autoFocus
+            />
+            <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Tarifa estándar calculada por grupos: <strong>{formatCurrency(cuotaSugeridaGrupos)}</strong>
+              {Number(cuotaRapidaInput) !== Number(cuotaSugeridaGrupos) && (
+                <span style={{ color: 'var(--primary-color)', marginLeft: '6px', fontWeight: 600 }}>
+                  (Precio personalizado)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {Number(cuotaRapidaInput) !== Number(cuotaSugeridaGrupos) && (
+            <div className="form-group full-width">
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}
+                onClick={() => setCuotaRapidaInput(cuotaSugeridaGrupos)}
+              >
+                Restablecer a tarifa estándar ({formatCurrency(cuotaSugeridaGrupos)})
+              </button>
+            </div>
+          )}
+
+          <div className="form-actions full-width">
+            <button type="button" className="btn-secondary" onClick={() => setIsCuotaModalOpen(false)}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary">
+              Guardar Cuota
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* MODAL DE EDICIÓN COMPLETA */}
       <ModalEditAlumno

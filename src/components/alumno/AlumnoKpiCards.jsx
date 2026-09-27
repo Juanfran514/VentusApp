@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, ShieldCheck, Edit2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const AlumnoKpiCards = ({
@@ -10,13 +10,27 @@ const AlumnoKpiCards = ({
   itemsPendientesCount = 0,
   totalPagado = 0,
   totalCobrosCount = 0,
-  currentMonthName = ''
+  currentMonthName = '',
+  onEditarCuota
 }) => {
   return (
     <div className="student-kpi-grid">
       <div className="student-kpi-card">
-        <div className="student-kpi-title">
-          <DollarSign size={16} /> Cuota Mensual
+        <div className="student-kpi-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="flex-center" style={{ gap: '4px' }}>
+            <DollarSign size={16} /> Cuota Mensual
+          </span>
+          {onEditarCuota && (
+            <button
+              type="button"
+              onClick={onEditarCuota}
+              className="btn-icon"
+              style={{ padding: '2px', color: 'var(--text-muted)' }}
+              title="Modificar precio de cuota mensual"
+            >
+              <Edit2 size={14} />
+            </button>
+          )}
         </div>
         <div className="student-kpi-value">{formatCurrency(cuota)}</div>
         <div className="student-kpi-sub">
