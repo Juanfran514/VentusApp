@@ -9,6 +9,7 @@ import {
   Edit2, Plus, RotateCcw, Trash2, User, Mail, ShieldCheck, X
 } from 'lucide-react';
 import { CINTURONES_DISPONIBLES, normalizarCinturon, getBeltClass } from '../utils/cinturones';
+import { DEFAULT_CATEGORIAS_MATERIAL, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
 import './AlumnoDetalle.css';
 import './Alumnos.css';
 
@@ -47,6 +48,13 @@ const AlumnoDetalle = () => {
   const alumno = useLiveQuery(() => db.alumnos.get(alumnoId), [alumnoId]);
   const todosPagos = useLiveQuery(() => db.pagos.toArray(), []);
   const grupos = useLiveQuery(() => db.grupos.toArray(), []);
+
+  // Materiales sugeridos persistentes para el modal de añadir material
+  const materialesSugeridos = useMemo(() => {
+    const stored = getStoredCategorias('material', DEFAULT_CATEGORIAS_MATERIAL);
+    const materialPagos = (todosPagos || []).filter(p => p.tipo === 'material');
+    return mergeCategorias(stored, materialPagos, 'concepto');
+  }, [todosPagos]);
 
   // Pagos vinculados a este alumno
   const pagosAlumno = useMemo(() => {
@@ -254,7 +262,7 @@ const AlumnoDetalle = () => {
       concepto = 'Examen de Grado';
       estado = 'pendiente';
     } else if (tipo === 'material') {
-      concepto = 'Material Deportivo';
+      concepto = '';
       estado = 'pendiente';
     }
 
@@ -273,6 +281,7 @@ const AlumnoDetalle = () => {
   const handleSavePago = async (e) => {
     e.preventDefault();
     try {
+      const conceptoTrimmed = pagoFormData.concepto.trim();
       await db.pagos.add(new Pago({
         alumnoId: alumno.id,
         tipo: pagoFormData.tipo,
@@ -280,9 +289,12 @@ const AlumnoDetalle = () => {
         año: Number(pagoFormData.año),
         importe: Number(pagoFormData.importe),
         fecha: new Date(pagoFormData.fecha).toISOString(),
-        concepto: pagoFormData.concepto,
+        concepto: conceptoTrimmed,
         estado: pagoFormData.estado
       }));
+      if (pagoFormData.tipo === 'material') {
+        saveStoredCategoria('material', conceptoTrimmed, DEFAULT_CATEGORIAS_MATERIAL);
+      }
       setIsPagoModalOpen(false);
     } catch (error) {
       console.error('Error registrando pago:', error);
@@ -995,8 +1007,17 @@ const AlumnoDetalle = () => {
                 value={pagoFormData.concepto}
                 onChange={(e) => setPagoFormData({ ...pagoFormData, concepto: e.target.value })}
                 required
-                placeholder={tipoNuevoPago === 'examen' ? 'Ej: Cinturón Amarillo' : 'Ej: Guantes 12oz, Espinilleras...'}
+                list={tipoNuevoPago === 'material' ? 'materiales-detalle-list' : undefined}
+                placeholder={tipoNuevoPago === 'examen' ? 'Ej: Cinturón Amarillo' : 'Escribe o selecciona un material...'}
+                autoComplete="off"
               />
+              {tipoNuevoPago === 'material' && (
+                <datalist id="materiales-detalle-list">
+                  {materialesSugeridos.map((mat, idx) => (
+                    <option key={idx} value={mat} />
+                  ))}
+                </datalist>
+              )}
             </div>
           )}
 

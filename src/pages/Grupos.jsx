@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Grupo } from '../db/db';
 import Modal from '../components/ui/Modal';
-import { Plus, Edit2, Trash2, X, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Users, FilterX } from 'lucide-react';
+import { DEFAULT_CATEGORIAS_GRUPOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
 import '../pages/Alumnos.css'; // Reusing Alumnos CSS since it has the table and modal styles
 
 const Grupos = () => {
@@ -11,6 +12,7 @@ const Grupos = () => {
   const [selectedGroupForLista, setSelectedGroupForLista] = useState(null);
 
   const [search, setSearch] = useState('');
+  const [filtroActividad, setFiltroActividad] = useState('');
   const [editingId, setEditingId] = useState(null);
   
   // tarifas form data will be an array of objects to make it easier to manage dynamically
@@ -36,6 +38,10 @@ const Grupos = () => {
         results = await db.grupos.toArray();
       }
 
+      if (filtroActividad) {
+        results = results.filter(g => g.actividad === filtroActividad);
+      }
+
       // Calculate Plazas Ocupadas based on active students
       if (alumnosTotales) {
         results.forEach(grupo => {
@@ -53,8 +59,14 @@ const Grupos = () => {
 
       return results;
     },
-    [search, alumnosTotales]
+    [search, filtroActividad, alumnosTotales]
   );
+
+  // Categorías/actividades sugeridas persistentes combinadas con las existentes en la BD
+  const actividadesSugeridas = useMemo(() => {
+    const stored = getStoredCategorias('grupos', DEFAULT_CATEGORIAS_GRUPOS);
+    return mergeCategorias(stored, grupos, 'actividad');
+  }, [grupos]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -155,9 +167,10 @@ const Grupos = () => {
         }
       });
 
+      const actividadTrimmed = formData.actividad.trim();
       const grupoData = {
-        nombre: formData.nombre,
-        actividad: formData.actividad,
+        nombre: formData.nombre.trim(),
+        actividad: actividadTrimmed,
         horarios: formData.horariosArray, // Guardamos el array directamente
         plazasMax: Number(formData.plazasMax),
         tarifas: tarifasMap
@@ -168,6 +181,9 @@ const Grupos = () => {
       } else {
         await db.grupos.add(new Grupo(grupoData));
       }
+
+      // Guardar categoría/actividad para que persista para siempre
+      saveStoredCategoria('grupos', actividadTrimmed, DEFAULT_CATEGORIAS_GRUPOS);
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error guardando grupo", error);
@@ -224,13 +240,38 @@ const Grupos = () => {
       </div>
 
       <div className="card">
-        <input 
-          type="text" 
-          placeholder="Buscar grupo por nombre o actividad..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="search-input"
-        />
+        {/* Barra de búsqueda y filtro por categoría/actividad */}
+        <div className="filters" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input 
+            type="text" 
+            placeholder="Buscar grupo por nombre o actividad..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+            style={{ minWidth: '240px', flex: 1, marginBottom: 0 }}
+          />
+          <select 
+            value={filtroActividad} 
+            onChange={(e) => setFiltroActividad(e.target.value)}
+            style={{ minWidth: '200px', width: 'auto' }}
+          >
+            <option value="">Todas las actividades</option>
+            {actividadesSugeridas.map((act, idx) => (
+              <option key={idx} value={act}>{act}</option>
+            ))}
+          </select>
+          {filtroActividad && (
+            <button 
+              className="btn-secondary flex-center" 
+              onClick={() => setFiltroActividad('')}
+              style={{ padding: '8px 15px' }}
+              title="Limpiar filtro"
+            >
+              <FilterX size={18} style={{ marginRight: '6px' }} />
+              Limpiar
+            </button>
+          )}
+        </div>
 
         <div className="table-container">
           <table>
@@ -288,8 +329,21 @@ const Grupos = () => {
             <input name="nombre" value={formData.nombre} onChange={handleInputChange} required placeholder="Ej: Infantil L-X" />
           </div>
           <div className="form-group">
-            <label>Actividad *</label>
-            <input name="actividad" value={formData.actividad} onChange={handleInputChange} required placeholder="Ej: Kickboxing" />
+            <label>Actividad / Categoría *</label>
+            <input 
+              name="actividad" 
+              value={formData.actividad} 
+              onChange={handleInputChange} 
+              required 
+              list="actividades-list"
+              placeholder="Escribe o selecciona una actividad"
+              autoComplete="off"
+            />
+            <datalist id="actividades-list">
+              {actividadesSugeridas.map((act, idx) => (
+                <option key={idx} value={act} />
+              ))}
+            </datalist>
           </div>
           <div className="form-group full-width">
             <label>Horarios (Días y Horas)</label>

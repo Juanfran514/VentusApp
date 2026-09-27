@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Gasto } from '../db/db';
 import Modal from '../components/ui/Modal';
 import { Plus, Trash2, FilterX } from 'lucide-react';
+import { DEFAULT_CATEGORIAS_GASTOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
 import '../pages/Alumnos.css'; 
 
 const Gastos = () => {
@@ -19,11 +20,10 @@ const Gastos = () => {
   // Obtenemos los gastos de la BD ordenados por fecha
   const gastos = useLiveQuery(() => db.gastos.orderBy('fecha').reverse().toArray());
 
-  // Extraemos las categorías únicas existentes para el filtro y el formulario
+  // Extraemos las categorías combinando las guardadas en localStorage con las de la BD
   const categoriasSugeridas = useMemo(() => {
-    if (!gastos) return [];
-    const uniqueCats = new Set(gastos.map(g => g.categoria).filter(c => c && c.trim() !== ''));
-    return Array.from(uniqueCats).sort();
+    const stored = getStoredCategorias('gastos', DEFAULT_CATEGORIAS_GASTOS);
+    return mergeCategorias(stored, gastos, 'categoria');
   }, [gastos]);
 
   // Aplicar el filtro de categoría seleccionada
@@ -54,12 +54,15 @@ const Gastos = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const catTrimmed = formData.categoria.trim();
       await db.gastos.add(new Gasto({
         concepto: formData.concepto.trim(),
-        categoria: formData.categoria.trim(), 
+        categoria: catTrimmed, 
         importe: Number(formData.importe),
         fecha: new Date(formData.fecha).toISOString()
       }));
+      // Guardar para que persista para siempre
+      saveStoredCategoria('gastos', catTrimmed, DEFAULT_CATEGORIAS_GASTOS);
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error al guardar el gasto:", error);

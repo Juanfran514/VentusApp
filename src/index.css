@@ -115,6 +115,7 @@ th {
 .sidebar-nav {
   flex: 1;
   padding: 1rem 0;
+  overflow-y: auto;
 }
 
 .nav-link {
@@ -134,6 +135,34 @@ th {
 .nav-link.active {
   background-color: var(--primary-dark);
   color: white;
+}
+
+.sidebar-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
+.sidebar-backup-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-backup-btn:hover {
+  background: rgba(134, 59, 255, 0.12);
+  color: var(--primary-color);
+  border-color: rgba(134, 59, 255, 0.25);
 }
 
 .main-content {

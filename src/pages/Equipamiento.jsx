@@ -2,13 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Pago } from '../db/db';
 import Modal from '../components/ui/Modal';
-import { Plus, Trash2, CheckCircle, Clock, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, RotateCcw, FilterX } from 'lucide-react';
+import { DEFAULT_CATEGORIAS_MATERIAL, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
 import '../pages/Alumnos.css'; 
 
 const Equipamiento = () => {
   const currentDate = new Date();
   const [activeTab, setActiveTab] = useState('pendientes');
   const [search, setSearch] = useState('');
+  const [filtroMaterial, setFiltroMaterial] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -29,6 +31,12 @@ const Equipamiento = () => {
     }, {});
   }, [alumnos]);
 
+  // Materiales sugeridos persistentes combinados con los existentes en la BD
+  const materialesSugeridos = useMemo(() => {
+    const stored = getStoredCategorias('material', DEFAULT_CATEGORIAS_MATERIAL);
+    return mergeCategorias(stored, equipamiento, 'concepto');
+  }, [equipamiento]);
+
   const { pendientes, pagados } = useMemo(() => {
     if (!equipamiento) return { pendientes: [], pagados: [] };
     
@@ -42,11 +50,15 @@ const Equipamiento = () => {
       });
     }
 
+    if (filtroMaterial) {
+      filtered = filtered.filter(p => p.concepto === filtroMaterial);
+    }
+
     const pendientesList = filtered.filter(p => p.estado === 'pendiente').sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
     const pagadosList = filtered.filter(p => p.estado === 'pagado').sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
     return { pendientes: pendientesList, pagados: pagadosList };
-  }, [equipamiento, alumnosMap, search]);
+  }, [equipamiento, alumnosMap, search, filtroMaterial]);
 
   const openModal = () => {
     setFormData({
@@ -71,14 +83,17 @@ const Equipamiento = () => {
     }
     
     try {
+      const conceptoTrimmed = formData.concepto.trim();
       await db.pagos.add(new Pago({
         alumnoId: formData.alumnoId,
         tipo: 'material',
         importe: formData.importe,
         fecha: new Date(formData.fecha).toISOString(),
-        concepto: formData.concepto,
+        concepto: conceptoTrimmed,
         estado: 'pendiente' // Se crea como deuda
       }));
+      // Guardar categoría/material para que persista para siempre
+      saveStoredCategoria('material', conceptoTrimmed, DEFAULT_CATEGORIAS_MATERIAL);
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error asignando material", error);
@@ -129,14 +144,37 @@ const Equipamiento = () => {
           </button>
         </div>
 
-        <div className="filters" style={{ marginBottom: '20px' }}>
+        {/* Barra de búsqueda y filtro por categoría/material */}
+        <div className="filters" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input 
             type="text" 
             placeholder="Buscar por alumno o material..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="search-input"
+            style={{ minWidth: '240px', flex: 1, marginBottom: 0 }}
           />
+          <select 
+            value={filtroMaterial} 
+            onChange={(e) => setFiltroMaterial(e.target.value)}
+            style={{ minWidth: '200px', width: 'auto' }}
+          >
+            <option value="">Todos los materiales</option>
+            {materialesSugeridos.map((mat, idx) => (
+              <option key={idx} value={mat}>{mat}</option>
+            ))}
+          </select>
+          {filtroMaterial && (
+            <button 
+              className="btn-secondary flex-center" 
+              onClick={() => setFiltroMaterial('')}
+              style={{ padding: '8px 15px' }}
+              title="Limpiar filtro"
+            >
+              <FilterX size={18} style={{ marginRight: '6px' }} />
+              Limpiar
+            </button>
+          )}
         </div>
 
         {activeTab === 'pendientes' && (
@@ -229,7 +267,21 @@ const Equipamiento = () => {
           </div>
           <div className="form-group full-width">
             <label>Concepto / Material *</label>
-            <input type="text" name="concepto" value={formData.concepto} onChange={handleInputChange} required placeholder="Ej: Guantes 12oz, Espinilleras, Karategui..." />
+            <input 
+              type="text" 
+              name="concepto" 
+              value={formData.concepto} 
+              onChange={handleInputChange} 
+              required 
+              list="materiales-list"
+              placeholder="Escribe o selecciona un material"
+              autoComplete="off"
+            />
+            <datalist id="materiales-list">
+              {materialesSugeridos.map((mat, idx) => (
+                <option key={idx} value={mat} />
+              ))}
+            </datalist>
           </div>
           <div className="form-group">
             <label>Fecha de Venta *</label>

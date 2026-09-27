@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -9,8 +9,14 @@ import Cobros from './pages/Cobros';
 import Examenes from './pages/Examenes';
 import Equipamiento from './pages/Equipamiento';
 import Gastos from './pages/Gastos';
+import { solicitarPersistenciaAutomatica } from './utils/backup';
 
 function App() {
+  // Solicita silenciosamente persistencia al navegador/iPad para evitar borrado de datos
+  useEffect(() => {
+    solicitarPersistenciaAutomatica();
+  }, []);
+
   return (
     <HashRouter>
       <Routes>
