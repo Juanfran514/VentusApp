@@ -3,9 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService, pagoService } from '../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import { DEFAULT_CATEGORIAS_MATERIAL, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
+import { exportarMesAPdf } from '../utils/pdfExport';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/common/StatusBadge';
 import SearchFilterBar from '../components/common/SearchFilterBar';
+import MonthlyAccordionList from '../components/common/MonthlyAccordionList';
 import { Plus, Trash2, RotateCcw } from 'lucide-react';
 import '../pages/Alumnos.css';
 
@@ -43,6 +45,11 @@ const Equipamiento = () => {
     }
     return pagoService.separarPendientesYPagados(baseList, alumnosMap, search);
   }, [equipamiento, alumnosMap, search, filtroMaterial]);
+
+  // Agrupación mensual del historial pagado
+  const gruposMensualesPagados = useMemo(() => {
+    return pagoService.agruparPagosPorMes(pagados);
+  }, [pagados]);
 
   const openModal = () => {
     setFormData({
@@ -100,6 +107,46 @@ const Equipamiento = () => {
       await pagoService.delete(id);
     }
   };
+
+  const handleExportPdfMes = async (grupo) => {
+    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'Importe'];
+    const rows = grupo.items.map(p => [
+      formatDate(p.fecha),
+      getNombreCompleto(alumnosMap[p.alumnoId]),
+      p.concepto,
+      formatCurrency(p.importe)
+    ]);
+    await exportarMesAPdf({
+      titulo: 'Informe de Equipamiento',
+      mesNombre: grupo.mesNombre,
+      headers,
+      rows,
+      totalImporte: grupo.totalImporte,
+      totalRegistros: grupo.totalItems,
+      nombreArchivo: `equipamiento_${grupo.key}.pdf`
+    });
+  };
+
+  const handleExportTodoPdf = async () => {
+    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'Importe'];
+    const rows = pagados.map(p => [
+      formatDate(p.fecha),
+      getNombreCompleto(alumnosMap[p.alumnoId]),
+      p.concepto,
+      formatCurrency(p.importe)
+    ]);
+    const total = pagados.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
+    await exportarMesAPdf({
+      titulo: 'Historial Completo de Equipamiento',
+      mesNombre: 'Todos los períodos',
+      headers,
+      rows,
+      totalImporte: total,
+      totalRegistros: pagados.length,
+      nombreArchivo: 'historial_equipamiento_completo.pdf'
+    });
+  };
+
 
   return (
     <div className="page-container">
@@ -197,42 +244,49 @@ const Equipamiento = () => {
         )}
 
         {activeTab === 'pagados' && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Alumno</th>
-                  <th>Material / Concepto</th>
-                  <th>Importe</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagados.map(pago => (
-                  <tr key={pago.id}>
-                    <td>{formatDate(pago.fecha)}</td>
-                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
-                    <td>{pago.concepto}</td>
-                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
-                    <td><StatusBadge status={pago.estado} /></td>
-                    <td>
-                      <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
-                        <RotateCcw size={18} />
-                      </button>
-                      <button className="btn-icon text-danger" title="Eliminar registro" onClick={() => handleDelete(pago.id)}>
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {pagados.length === 0 && (
-                  <tr><td colSpan="6" className="text-center">No hay registros de material pagado.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <MonthlyAccordionList
+            gruposMensuales={gruposMensualesPagados}
+            tituloTipo="Equipamiento"
+            tipoRegistroLabel="artículos"
+            emptyMessage="No hay registros de material pagado."
+            onExportPdf={handleExportPdfMes}
+            onExportTodoPdf={handleExportTodoPdf}
+            renderTable={(items) => (
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Alumno</th>
+                      <th>Material / Concepto</th>
+                      <th>Importe</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(pago => (
+                      <tr key={pago.id}>
+                        <td>{formatDate(pago.fecha)}</td>
+                        <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
+                        <td>{pago.concepto}</td>
+                        <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
+                        <td><StatusBadge status={pago.estado} /></td>
+                        <td>
+                          <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
+                            <RotateCcw size={18} />
+                          </button>
+                          <button className="btn-icon text-danger" title="Eliminar registro" onClick={() => handleDelete(pago.id)}>
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          />
         )}
       </div>
 

@@ -2,9 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService, pagoService } from '../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
+import { exportarMesAPdf } from '../utils/pdfExport';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/common/StatusBadge';
-import { Plus, Trash2, RotateCcw } from 'lucide-react';
+import MonthlyAccordionList from '../components/common/MonthlyAccordionList';
+import { Plus, Trash2, RotateCcw, Calendar } from 'lucide-react';
 import '../pages/Alumnos.css';
 
 const MESES = [
@@ -16,17 +18,19 @@ const MESES = [
 
 const Cobros = () => {
   const currentDate = new Date();
+  const currentMes = currentDate.getMonth() + 1;
+  const currentAño = currentDate.getFullYear();
+  const currentMesNombre = MESES.find(m => m.id === currentMes)?.name || '';
+
   const [activeTab, setActiveTab] = useState('pendientes');
-  const [selectedMes, setSelectedMes] = useState(currentDate.getMonth() + 1);
-  const [selectedAño, setSelectedAño] = useState(currentDate.getFullYear());
   const [search, setSearch] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     alumnoId: '',
     tipo: 'cuota',
-    mes: currentDate.getMonth() + 1,
-    año: currentDate.getFullYear(),
+    mes: currentMes,
+    año: currentAño,
     importe: 0,
     fecha: currentDate.toISOString().split('T')[0]
   });
@@ -37,10 +41,10 @@ const Cobros = () => {
 
   const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
-  // Lógica de cálculo mensual delegada al servicio (SRP)
+  // Estado de cuotas del mes actual (SRP)
   const { pendientes, pagados: pagadosDelMes } = useMemo(() => {
-    return pagoService.calcularEstadoCuotasMes(alumnos, pagos, selectedMes, selectedAño, search);
-  }, [alumnos, pagos, selectedMes, selectedAño, search]);
+    return pagoService.calcularEstadoCuotasMes(alumnos, pagos, currentMes, currentAño, search);
+  }, [alumnos, pagos, currentMes, currentAño, search]);
 
   const historial = useMemo(() => {
     if (!pagos) return [];
@@ -55,6 +59,11 @@ const Cobros = () => {
     return filtrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   }, [pagos, alumnosMap, search]);
 
+  // Agrupación mensual para el historial de cuotas
+  const gruposMensualesCuotas = useMemo(() => {
+    return pagoService.agruparPagosPorMes(historial);
+  }, [historial]);
+
   const openModal = (alumnoId = '') => {
     let importe = 0;
     if (alumnoId) {
@@ -67,13 +76,14 @@ const Cobros = () => {
     setFormData({
       alumnoId,
       tipo: 'cuota',
-      mes: selectedMes,
-      año: selectedAño,
+      mes: currentMes,
+      año: currentAño,
       importe,
       fecha: new Date().toISOString().split('T')[0]
     });
     setIsModalOpen(true);
   };
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -123,6 +133,45 @@ const Cobros = () => {
     if (window.confirm('¿Deshacer el pago de esta cuota? El alumno volverá a aparecer como Pendiente.')) {
       await pagoService.delete(id);
     }
+  };
+
+  const handleExportPdfMes = async (grupo) => {
+    const headers = ['Fecha', 'Alumno', 'Período', 'Importe'];
+    const rows = grupo.items.map(p => [
+      formatDate(p.fecha),
+      getNombreCompleto(alumnosMap[p.alumnoId]),
+      p.concepto || `Cuota ${MESES.find(m => m.id === p.mes)?.name || ''} ${p.año || ''}`,
+      formatCurrency(p.importe)
+    ]);
+    await exportarMesAPdf({
+      titulo: 'Informe de Cuotas',
+      mesNombre: grupo.mesNombre,
+      headers,
+      rows,
+      totalImporte: grupo.totalImporte,
+      totalRegistros: grupo.totalItems,
+      nombreArchivo: `cuotas_${grupo.key}.pdf`
+    });
+  };
+
+  const handleExportTodoPdf = async () => {
+    const headers = ['Fecha', 'Alumno', 'Período', 'Importe'];
+    const rows = historial.map(p => [
+      formatDate(p.fecha),
+      getNombreCompleto(alumnosMap[p.alumnoId]),
+      p.concepto || `Cuota ${MESES.find(m => m.id === p.mes)?.name || ''} ${p.año || ''}`,
+      formatCurrency(p.importe)
+    ]);
+    const total = historial.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
+    await exportarMesAPdf({
+      titulo: 'Historial Completo de Cuotas',
+      mesNombre: 'Todos los períodos',
+      headers,
+      rows,
+      totalImporte: total,
+      totalRegistros: historial.length,
+      nombreArchivo: 'historial_cuotas_completo.pdf'
+    });
   };
 
   const currentYear = new Date().getFullYear();
@@ -175,16 +224,6 @@ const Cobros = () => {
         </div>
 
         <div className="filters" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {activeTab === 'pendientes' && (
-            <>
-              <select value={selectedMes} onChange={(e) => setSelectedMes(Number(e.target.value))} className="search-input" style={{ width: 'auto', marginBottom: 0 }}>
-                {MESES.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-              <select value={selectedAño} onChange={(e) => setSelectedAño(Number(e.target.value))} className="search-input" style={{ width: 'auto', marginBottom: 0 }}>
-                {años.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </>
-          )}
           <div style={{ flex: 1 }}>
             <input 
               type="text" 
@@ -195,6 +234,15 @@ const Cobros = () => {
               style={{ marginBottom: 0 }}
             />
           </div>
+          {activeTab === 'pendientes' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              <Calendar size={16} />
+              <span>Mes en curso:</span>
+              <span style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold' }}>
+                {currentMesNombre} {currentAño}
+              </span>
+            </div>
+          )}
         </div>
 
         {activeTab === 'pendientes' && (
@@ -238,42 +286,49 @@ const Cobros = () => {
         )}
 
         {activeTab === 'historial' && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Alumno</th>
-                  <th>Tipo</th>
-                  <th>Período</th>
-                  <th>Importe</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historial.map(pago => (
-                  <tr key={pago.id}>
-                    <td>{formatDate(pago.fecha)}</td>
-                    <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
-                    <td style={{ textTransform: 'capitalize' }}>{pago.tipo}</td>
-                    <td>{pago.tipo === 'cuota' ? `${MESES.find(m => m.id === pago.mes)?.name} ${pago.año}` : '-'}</td>
-                    <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
-                    <td>
-                      <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
-                        <RotateCcw size={18} />
-                      </button>
-                      <button className="btn-icon text-danger" title="Eliminar registro" onClick={() => handleDeletePago(pago.id)}>
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {historial.length === 0 && (
-                  <tr><td colSpan="6" className="text-center">No hay registros de cobros.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <MonthlyAccordionList
+            gruposMensuales={gruposMensualesCuotas}
+            tituloTipo="Cuotas"
+            tipoRegistroLabel="cuotas"
+            emptyMessage="No hay registros de cobros en el historial."
+            onExportPdf={handleExportPdfMes}
+            onExportTodoPdf={handleExportTodoPdf}
+            renderTable={(items) => (
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Alumno</th>
+                      <th>Tipo</th>
+                      <th>Período</th>
+                      <th>Importe</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(pago => (
+                      <tr key={pago.id}>
+                        <td>{formatDate(pago.fecha)}</td>
+                        <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
+                        <td style={{ textTransform: 'capitalize' }}>{pago.tipo}</td>
+                        <td>{pago.tipo === 'cuota' ? `${MESES.find(m => m.id === pago.mes)?.name || ''} ${pago.año || ''}` : '-'}</td>
+                        <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
+                        <td>
+                          <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
+                            <RotateCcw size={18} />
+                          </button>
+                          <button className="btn-icon text-danger" title="Eliminar registro" onClick={() => handleDeletePago(pago.id)}>
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          />
         )}
       </div>
 

@@ -105,12 +105,13 @@ export const pagoService = {
     const añoNum = Number(año);
     const term = search.toLowerCase().trim();
 
-    // Pagos de cuota del mes correspondiente
-    const pagosCuotaMes = pagos.filter(p => 
-      p.tipo === 'cuota' && 
-      Number(p.mes) === mesNum && 
-      Number(p.año) === añoNum
-    );
+    // Pagos de cuota del mes correspondiente (soporta p.mes/p.año o fallback a p.fecha)
+    const pagosCuotaMes = pagos.filter(p => {
+      if (p.tipo !== 'cuota') return false;
+      const pMes = p.mes ? Number(p.mes) : (p.fecha ? new Date(p.fecha).getMonth() + 1 : null);
+      const pAño = p.año ? Number(p.año) : (p.fecha ? new Date(p.fecha).getFullYear() : null);
+      return pMes === mesNum && pAño === añoNum;
+    });
 
     const alumnosPagadosIds = new Set(pagosCuotaMes.map(p => Number(p.alumnoId)));
 
@@ -129,5 +130,71 @@ export const pagoService = {
     });
 
     return { pendientes, pagados };
+  },
+
+  /**
+   * Agrupa pagos por mes y año en orden cronológico descendente
+   * @param {Array} pagos
+   * @returns {Array<{ key: string, mesNombre: string, año: number, mes: number, totalImporte: number, totalItems: number, items: Array }>}
+   */
+  agruparPagosPorMes(pagos = []) {
+    if (!pagos || !pagos.length) return [];
+
+    const MESES_NOMBRES = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const gruposMap = {};
+
+    pagos.forEach(p => {
+      let año = null;
+      let mes = null;
+
+      if (p.tipo === 'cuota' && p.año && p.mes) {
+        año = Number(p.año);
+        mes = Number(p.mes);
+      } else if (p.fecha) {
+        const d = new Date(p.fecha);
+        if (!isNaN(d.getTime())) {
+          año = d.getFullYear();
+          mes = d.getMonth() + 1;
+        }
+      }
+
+      if (!año || !mes) {
+        const now = new Date();
+        año = now.getFullYear();
+        mes = now.getMonth() + 1;
+      }
+
+      const key = `${año}-${String(mes).padStart(2, '0')}`;
+      if (!gruposMap[key]) {
+        gruposMap[key] = {
+          key,
+          año,
+          mes,
+          mesNombre: `${MESES_NOMBRES[mes - 1] || 'Mes'} ${año}`,
+          totalImporte: 0,
+          totalItems: 0,
+          items: []
+        };
+      }
+
+      gruposMap[key].items.push(p);
+      gruposMap[key].totalImporte += Number(p.importe) || 0;
+      gruposMap[key].totalItems += 1;
+    });
+
+    // Ordenar de más reciente a más antiguo
+    const gruposOrdenados = Object.values(gruposMap).sort((a, b) => b.key.localeCompare(a.key));
+
+    // Dentro de cada mes, ordenar los pagos por fecha descendente
+    gruposOrdenados.forEach(grupo => {
+      grupo.items.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    });
+
+    return gruposOrdenados;
   }
 };
+

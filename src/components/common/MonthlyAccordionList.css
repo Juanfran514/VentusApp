@@ -1,0 +1,235 @@
+.monthly-accordion-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.monthly-accordion-summary-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.monthly-accordion-summary-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.monthly-accordion-summary-text strong {
+  color: var(--text-light);
+}
+
+.monthly-accordion-summary-text .highlight-amount {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.monthly-accordion-global-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-accordion-control {
+  background: var(--bg-dark);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-accordion-control:hover {
+  background: var(--bg-panel);
+  color: var(--text-light);
+  border-color: var(--primary-color);
+}
+
+.btn-accordion-export-all {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-accordion-export-all:hover {
+  background: rgba(34, 197, 94, 0.25);
+  transform: translateY(-1px);
+}
+
+.monthly-accordion-item {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-panel);
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.monthly-accordion-item.is-open {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.monthly-accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.02);
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.monthly-accordion-header:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.monthly-accordion-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.monthly-accordion-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.monthly-accordion-chevron.rotate {
+  transform: rotate(90deg);
+  color: var(--primary-color);
+}
+
+.monthly-accordion-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin: 0;
+}
+
+.monthly-accordion-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge-items-count {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-month-total {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.monthly-accordion-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-export-pdf-month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--primary-color);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export-pdf-month:hover {
+  background-color: rgba(34, 197, 94, 0.3);
+  border-color: var(--primary-color);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.monthly-accordion-content {
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-dark);
+  animation: accordionFadeIn 0.2s ease;
+}
+
+@keyframes accordionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.monthly-accordion-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .monthly-accordion-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .monthly-accordion-header-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .monthly-accordion-summary-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .monthly-accordion-global-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
