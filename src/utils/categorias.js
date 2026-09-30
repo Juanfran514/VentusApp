@@ -1,49 +1,9 @@
 // Utilidades para persistencia y sugerencia de categorías y actividades
 
-export const DEFAULT_CATEGORIAS_GRUPOS = [
-  'Taekwondo',
-  'Kickboxing',
-  'Boxeo',
-  'Defensa Personal',
-  'Jiu-Jitsu',
-  'Infantil',
-  'Adultos'
-];
-
-export const DEFAULT_CATEGORIAS_MATERIAL = [
-  'Guantes 10oz',
-  'Guantes 12oz',
-  'Guantes 14oz',
-  'Espinilleras',
-  'Dobok',
-  'Karategui / Kimono',
-  'Protector Bucal',
-  'Vendas 4m',
-  'Casco',
-  'Peto Protector',
-  'Comba'
-];
-
-export const DEFAULT_CATEGORIAS_LICENCIAS = [
-  'Licencia Autonómica',
-  'Licencia Nacional',
-  'Seguro Federativo Anual',
-  'Licencia Infantil',
-  'Licencia Adulto',
-  'Carnet de Grados'
-];
-
-export const DEFAULT_CATEGORIAS_GASTOS = [
-  'Alquiler',
-  'Luz / Electricidad',
-  'Agua',
-  'Material Deportivo',
-  'Mantenimiento',
-  'Licencias / Seguros',
-  'Publicidad',
-  'Impuestos',
-  'Otros'
-];
+export const DEFAULT_CATEGORIAS_GRUPOS = [];
+export const DEFAULT_CATEGORIAS_MATERIAL = [];
+export const DEFAULT_CATEGORIAS_LICENCIAS = [];
+export const DEFAULT_CATEGORIAS_GASTOS = [];
 
 /**
  * Obtiene la lista de categorías almacenadas para una clave dada, combinándola con los valores por defecto

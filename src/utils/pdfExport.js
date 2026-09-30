@@ -175,26 +175,7 @@ export const exportarMesAPdf = async ({
     }
   });
 
-  // 5. Descarga directa o Compartir (compatible con iPadOS / AirDrop)
-  const blob = doc.output('blob');
-  const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
-
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: nombreArchivo,
-        text: `${titulo} - ${mesNombre}`
-      });
-      return { exito: true, metodo: 'share' };
-    } catch (shareErr) {
-      if (shareErr.name === 'AbortError') {
-        return { exito: false, cancelado: true };
-      }
-    }
-  }
-
-  // Descarga habitual
+  // 5. Descarga directa del archivo PDF
   doc.save(nombreArchivo);
   return { exito: true, metodo: 'download' };
 };
@@ -436,25 +417,7 @@ export const exportarBalanceFinancieroPDF = async ({
     );
   }
 
-  // Descarga directa o compartir Web Share
-  const blob = doc.output('blob');
-  const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
-
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: nombreArchivo,
-        text: `Balance Financiero - ${mesNombre}`
-      });
-      return { exito: true, metodo: 'share' };
-    } catch (shareErr) {
-      if (shareErr.name === 'AbortError') {
-        return { exito: false, cancelado: true };
-      }
-    }
-  }
-
+  // Descarga directa del archivo PDF
   doc.save(nombreArchivo);
   return { exito: true, metodo: 'download' };
 };
