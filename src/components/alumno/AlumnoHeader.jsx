@@ -83,6 +83,7 @@ const AlumnoHeader = ({ alumno, edad, onCambioCinturon, onToggleEstado }) => {
               <Mail size={16} />
               <a href={`mailto:${alumno.email}`}>{alumno.email}</a>
             </div>
+          )}
         </div>
       </div>
     </div>
