@@ -24,6 +24,15 @@ export const DEFAULT_CATEGORIAS_MATERIAL = [
   'Comba'
 ];
 
+export const DEFAULT_CATEGORIAS_LICENCIAS = [
+  'Licencia Autonómica',
+  'Licencia Nacional',
+  'Seguro Federativo Anual',
+  'Licencia Infantil',
+  'Licencia Adulto',
+  'Carnet de Grados'
+];
+
 export const DEFAULT_CATEGORIAS_GASTOS = [
   'Alquiler',
   'Luz / Electricidad',

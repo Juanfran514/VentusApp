@@ -7,6 +7,7 @@ const ModalPagoAlumno = ({
   tipo = 'cuota',
   alumno,
   materialesSugeridos = [],
+  licenciasSugeridas = [],
   onSave,
   mesesNombres = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -40,6 +41,9 @@ const ModalPagoAlumno = ({
       } else if (tipo === 'material') {
         concepto = '';
         estado = 'pendiente';
+      } else if (tipo === 'licencia') {
+        concepto = 'Licencia Autonómica';
+        estado = 'pendiente';
       }
 
       setFormData({
@@ -60,7 +64,7 @@ const ModalPagoAlumno = ({
   };
 
   const title = `Registrar ${
-    tipo === 'cuota' ? 'Cobro de Cuota' : tipo === 'examen' ? 'Examen' : 'Material'
+    tipo === 'cuota' ? 'Cobro de Cuota' : tipo === 'examen' ? 'Examen' : tipo === 'material' ? 'Material' : 'Licencia Deportiva'
   }`;
 
   return (
@@ -98,14 +102,21 @@ const ModalPagoAlumno = ({
               value={formData.concepto}
               onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
               required
-              list={tipo === 'material' ? 'materiales-detalle-list' : undefined}
-              placeholder={tipo === 'examen' ? 'Ej: Cinturón Amarillo' : 'Escribe o selecciona un material...'}
+              list={tipo === 'material' ? 'materiales-detalle-list' : tipo === 'licencia' ? 'licencias-detalle-list' : undefined}
+              placeholder={tipo === 'examen' ? 'Ej: Cinturón Amarillo' : tipo === 'material' ? 'Escribe o selecciona un material...' : 'Escribe o selecciona una licencia...'}
               autoComplete="off"
             />
             {tipo === 'material' && (
               <datalist id="materiales-detalle-list">
                 {materialesSugeridos.map((mat, idx) => (
                   <option key={idx} value={mat} />
+                ))}
+              </datalist>
+            )}
+            {tipo === 'licencia' && (
+              <datalist id="licencias-detalle-list">
+                {licenciasSugeridas.map((lic, idx) => (
+                  <option key={idx} value={lic} />
                 ))}
               </datalist>
             )}

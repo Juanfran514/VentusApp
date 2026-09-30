@@ -1,6 +1,6 @@
 import { db, Pago } from '../db/db';
 import { getNombreCompleto } from '../utils/formatters';
-import { saveStoredCategoria, DEFAULT_CATEGORIAS_MATERIAL } from '../utils/categorias';
+import { saveStoredCategoria, DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS } from '../utils/categorias';
 
 export const pagoService = {
   /**
@@ -19,7 +19,7 @@ export const pagoService = {
   },
 
   /**
-   * Obtiene los pagos de un tipo específico ('cuota', 'examen', 'material')
+   * Obtiene los pagos de un tipo específico ('cuota', 'examen', 'material', 'licencia')
    */
   async getByTipo(tipo) {
     if (!tipo) return db.pagos.toArray();
@@ -41,6 +41,8 @@ export const pagoService = {
     const id = await db.pagos.add(pagoInstance);
     if (data.tipo === 'material' && data.concepto) {
       saveStoredCategoria('material', data.concepto.trim(), DEFAULT_CATEGORIAS_MATERIAL);
+    } else if (data.tipo === 'licencia' && data.concepto) {
+      saveStoredCategoria('licencias', data.concepto.trim(), DEFAULT_CATEGORIAS_LICENCIAS);
     }
     return id;
   },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Medal, Package, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, Medal, Package, IdCard, RotateCcw, Trash2 } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -18,7 +18,8 @@ const AlumnoPagosTab = ({
     { id: 'pendientes', label: 'Solo Pendientes' },
     { id: 'cuota', label: 'Cuotas' },
     { id: 'examen', label: 'Exámenes' },
-    { id: 'material', label: 'Material' }
+    { id: 'material', label: 'Material' },
+    { id: 'licencia', label: 'Licencias' }
   ];
 
   return (
@@ -38,7 +39,7 @@ const AlumnoPagosTab = ({
         </div>
 
         {/* Acciones directas para añadir cobro */}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             className="btn-primary flex-center"
             onClick={() => onOpenPagoModal('cuota')}
@@ -59,6 +60,13 @@ const AlumnoPagosTab = ({
             style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
           >
             <Package size={16} style={{ marginRight: '4px' }} /> Material
+          </button>
+          <button
+            className="btn-secondary flex-center"
+            onClick={() => onOpenPagoModal('licencia')}
+            style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+          >
+            <IdCard size={16} style={{ marginRight: '4px' }} /> Licencia
           </button>
         </div>
       </div>

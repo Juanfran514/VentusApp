@@ -3,8 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService } from '../services/alumnoService';
 import { pagoService } from '../services/pagoService';
 import { gastoService } from '../services/gastoService';
-import { Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
-import { formatCurrency } from '../utils/formatters';
+import { Users, TrendingUp, TrendingDown, DollarSign, FileDown } from 'lucide-react';
+import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
+import { exportarBalanceFinancieroPDF } from '../utils/pdfExport';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -15,6 +16,8 @@ const Dashboard = () => {
   const alumnos = useLiveQuery(() => alumnoService.getAll(), []) || [];
   const pagos = useLiveQuery(() => pagoService.getAll(), []) || [];
   const gastos = useLiveQuery(() => gastoService.getAll(), []) || [];
+
+  const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -51,6 +54,84 @@ const Dashboard = () => {
   }, [gastos, selectedMonth, selectedYear]);
 
   const netProfit = currentMonthIncome - currentMonthExpenses;
+
+  // Exportar Balance Financiero en PDF
+  const handleExportBalancePdf = async () => {
+    const mesObj = meses.find(m => m.value === selectedMonth);
+    const mesNombre = `${mesObj?.label || ''} ${selectedYear}`;
+
+    // 1. Pagos abonados en el mes seleccionado
+    const pagosMes = pagos.filter(p => {
+      if (p.estado !== 'pagado') return false;
+      const pMes = p.mes ? Number(p.mes) : (p.fecha ? new Date(p.fecha).getMonth() + 1 : null);
+      const pAño = p.año ? Number(p.año) : (p.fecha ? new Date(p.fecha).getFullYear() : null);
+      return pMes === selectedMonth && pAño === selectedYear;
+    });
+
+    // 2. Gastos en el mes seleccionado
+    const gastosMes = gastos.filter(g => {
+      const d = new Date(g.fecha);
+      return (d.getMonth() + 1) === selectedMonth && d.getFullYear() === selectedYear;
+    });
+
+    // 3. Desglose de ingresos por fuente (cuota, examen, material, licencia)
+    const fuentesMap = {
+      cuota: { fuente: 'Cuotas Mensuales', cantidad: 0, total: 0 },
+      examen: { fuente: 'Exámenes de Grado', cantidad: 0, total: 0 },
+      material: { fuente: 'Venta de Equipamiento', cantidad: 0, total: 0 },
+      licencia: { fuente: 'Licencias Deportivas', cantidad: 0, total: 0 }
+    };
+
+    pagosMes.forEach(p => {
+      const tipoKey = p.tipo || 'cuota';
+      if (!fuentesMap[tipoKey]) {
+        fuentesMap[tipoKey] = { fuente: `Otros (${tipoKey})`, cantidad: 0, total: 0 };
+      }
+      fuentesMap[tipoKey].cantidad += 1;
+      fuentesMap[tipoKey].total += Number(p.importe) || 0;
+    });
+
+    const desgloseIngresos = Object.values(fuentesMap).filter(f => f.cantidad > 0);
+
+    // 4. Desglose de gastos por categoría
+    const desgloseGastos = gastoService.agruparPorCategoria(gastos, selectedMonth, selectedYear)
+      .map(g => ({ categoria: g.name, total: g.value }));
+
+    // 5. Filas detalladas de ingresos
+    const filasIngresos = pagosMes.map(p => {
+      const al = alumnosMap[p.alumnoId];
+      const nombreAl = al ? getNombreCompleto(al) : 'Alumno sin nombre';
+      const tipoLabel = p.tipo ? p.tipo.charAt(0).toUpperCase() + p.tipo.slice(1) : 'Pago';
+      const conceptoStr = p.concepto || (p.tipo === 'cuota' ? `Cuota ${mesObj?.label} ${selectedYear}` : '-');
+      return [
+        formatDate(p.fecha),
+        nombreAl,
+        tipoLabel,
+        conceptoStr,
+        `+${formatCurrency(p.importe)}`
+      ];
+    });
+
+    // 6. Filas detalladas de gastos
+    const filasGastos = gastosMes.map(g => [
+      formatDate(g.fecha),
+      g.concepto || '-',
+      g.categoria || 'Otros',
+      `-${formatCurrency(g.importe)}`
+    ]);
+
+    await exportarBalanceFinancieroPDF({
+      mesNombre,
+      totalIngresos: currentMonthIncome,
+      totalGastos: currentMonthExpenses,
+      beneficioNeto: netProfit,
+      desgloseIngresos,
+      desgloseGastos,
+      filasIngresos,
+      filasGastos,
+      nombreArchivo: `balance_financiero_${selectedYear}_${String(selectedMonth).padStart(2, '0')}.pdf`
+    });
+  };
 
   // Flujo de Caja anual: Ingresos vs Gastos mes a mes
   const chartData = useMemo(() => {
@@ -92,7 +173,7 @@ const Dashboard = () => {
           <h1>Dashboard</h1>
           <p>Resumen financiero y estado de la academia</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select 
             value={selectedMonth} 
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -107,6 +188,16 @@ const Dashboard = () => {
           >
             {años.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <button 
+            type="button" 
+            className="btn-primary flex-center" 
+            onClick={handleExportBalancePdf}
+            title="Descargar el Balance Financiero completo en PDF"
+            style={{ padding: '0.55rem 0.9rem', fontSize: '0.9rem' }}
+          >
+            <FileDown size={17} style={{ marginRight: '6px' }} />
+            Exportar Balance PDF
+          </button>
         </div>
       </div>
 

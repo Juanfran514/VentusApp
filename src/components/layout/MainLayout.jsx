@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { 
-  Home, Users, BookOpen, CreditCard, Receipt, Medal, Package, 
+  Home, Users, BookOpen, CreditCard, Receipt, Medal, Package, IdCard,
   ShieldCheck, Download, Upload, CheckCircle, AlertTriangle 
 } from 'lucide-react';
 import Modal from '../ui/Modal';
@@ -97,6 +97,10 @@ const MainLayout = () => {
           <NavLink to="/equipamiento" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Package size={20} />
             <span className="nav-text">Equipamiento</span>
+          </NavLink>
+          <NavLink to="/licencias" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <IdCard size={20} />
+            <span className="nav-text">Licencias</span>
           </NavLink>
           <NavLink to="/alumnos" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Users size={20} />

@@ -17,7 +17,7 @@ import {
   ArrowLeft, Calendar, AlertTriangle,
   DollarSign, Medal, Edit2, Plus, RotateCcw, Trash2
 } from 'lucide-react';
-import { DEFAULT_CATEGORIAS_MATERIAL, getStoredCategorias, mergeCategorias } from '../utils/categorias';
+import { DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS, getStoredCategorias, mergeCategorias } from '../utils/categorias';
 import { calculateAge, formatCurrency, formatDate } from '../utils/formatters';
 import './AlumnoDetalle.css';
 import './Alumnos.css';
@@ -53,6 +53,13 @@ const AlumnoDetalle = () => {
     const stored = getStoredCategorias('material', DEFAULT_CATEGORIAS_MATERIAL);
     const materialPagos = (todosPagos || []).filter(p => p.tipo === 'material');
     return mergeCategorias(stored, materialPagos, 'concepto');
+  }, [todosPagos]);
+
+  // Licencias sugeridas para autocompletado
+  const licenciasSugeridas = useMemo(() => {
+    const stored = getStoredCategorias('licencias', DEFAULT_CATEGORIAS_LICENCIAS);
+    const licenciaPagos = (todosPagos || []).filter(p => p.tipo === 'licencia');
+    return mergeCategorias(stored, licenciaPagos, 'concepto');
   }, [todosPagos]);
 
   // Pagos vinculados a este alumno
@@ -482,6 +489,7 @@ const AlumnoDetalle = () => {
         tipo={tipoNuevoPago}
         alumno={alumno}
         materialesSugeridos={materialesSugeridos}
+        licenciasSugeridas={licenciasSugeridas}
         onSave={handleSavePago}
         mesesNombres={MESES_NOMBRES}
       />

@@ -28,6 +28,7 @@ export const exportarCopiaSeguridad = async () => {
   const categoriasGastos = localStorage.getItem('ventus_cat_gastos');
   const categoriasGrupos = localStorage.getItem('ventus_cat_grupos');
   const categoriasMaterial = localStorage.getItem('ventus_cat_material');
+  const categoriasLicencias = localStorage.getItem('ventus_cat_licencias');
 
   const backupData = {
     app: 'VentusApp',
@@ -41,7 +42,8 @@ export const exportarCopiaSeguridad = async () => {
       categorias: {
         gastos: categoriasGastos ? JSON.parse(categoriasGastos) : [],
         grupos: categoriasGrupos ? JSON.parse(categoriasGrupos) : [],
-        material: categoriasMaterial ? JSON.parse(categoriasMaterial) : []
+        material: categoriasMaterial ? JSON.parse(categoriasMaterial) : [],
+        licencias: categoriasLicencias ? JSON.parse(categoriasLicencias) : []
       }
     }
   };
@@ -122,6 +124,9 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
   }
   if (categorias?.material && Array.isArray(categorias.material)) {
     localStorage.setItem('ventus_cat_material', JSON.stringify(categorias.material));
+  }
+  if (categorias?.licencias && Array.isArray(categorias.licencias)) {
+    localStorage.setItem('ventus_cat_licencias', JSON.stringify(categorias.licencias));
   }
 
   return {

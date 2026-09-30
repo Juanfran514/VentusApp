@@ -31,6 +31,15 @@ export const TIPOS_PAGO = {
     requiresPeriod: false,
     placeholderConcepto: 'Ej: Guantes 12oz, Espinilleras...',
     defaultConcepto: () => ''
+  },
+  LICENCIA: {
+    id: 'licencia',
+    label: 'Licencia',
+    modalTitle: 'Licencia Deportiva',
+    estadoInicial: 'pendiente',
+    requiresPeriod: false,
+    placeholderConcepto: 'Ej: Licencia Autonómica 2026, Seguro Federativo...',
+    defaultConcepto: () => 'Licencia Deportiva'
   }
 };
 

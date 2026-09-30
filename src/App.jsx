@@ -8,6 +8,7 @@ import Grupos from './pages/Grupos';
 import Cobros from './pages/Cobros';
 import Examenes from './pages/Examenes';
 import Equipamiento from './pages/Equipamiento';
+import Licencias from './pages/Licencias';
 import Gastos from './pages/Gastos';
 import { solicitarPersistenciaAutomatica } from './utils/backup';
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="cobros" element={<Cobros />} />
           <Route path="examenes" element={<Examenes />} />
           <Route path="equipamiento" element={<Equipamiento />} />
+          <Route path="licencias" element={<Licencias />} />
           <Route path="gastos" element={<Gastos />} />
         </Route>
       </Routes>
