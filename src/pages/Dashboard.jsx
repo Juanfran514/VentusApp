@@ -164,7 +164,43 @@ const Dashboard = () => {
     return gastoService.agruparPorCategoria(gastos, selectedMonth, selectedYear);
   }, [gastos, selectedMonth, selectedYear]);
 
-  const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#8b5cf6'];
+  const VIBRANT_PALETTE = [
+    '#8b5cf6', // Violeta
+    '#06b6d4', // Cían / Azul
+    '#f59e0b', // Ámbar / Amarillo
+    '#ec4899', // Rosa
+    '#10b981', // Verde Esmeralda
+    '#6366f1', // Índigo
+    '#f97316', // Naranja
+    '#3b82f6', // Azul Eléctrico
+    '#14b8a6', // Turquesa
+    '#a855f7'  // Púrpura
+  ];
+
+  const CATEGORY_COLORS = {
+    'Alquiler': '#6366f1',
+    'Luz / Electricidad': '#f59e0b',
+    'Luz': '#f59e0b',
+    'Agua': '#06b6d4',
+    'Material Deportivo': '#10b981',
+    'Material': '#10b981',
+    'Mantenimiento': '#f97316',
+    'Licencias / Seguros': '#8b5cf6',
+    'Licencias': '#8b5cf6',
+    'Publicidad': '#ec4899',
+    'Impuestos': '#ef4444',
+    'Otros': '#64748b'
+  };
+
+  const getCategoryColor = (name, index) => {
+    if (name && CATEGORY_COLORS[name]) return CATEGORY_COLORS[name];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colorIndex = Math.abs(hash) % VIBRANT_PALETTE.length;
+    return VIBRANT_PALETTE[colorIndex] || VIBRANT_PALETTE[index % VIBRANT_PALETTE.length];
+  };
 
   return (
     <div className="dashboard-container">
@@ -282,8 +318,8 @@ const Dashboard = () => {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {expensesByCategory.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {expensesByCategory.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name, index)} />
                     ))}
                   </Pie>
                   <RechartsTooltip 
