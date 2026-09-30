@@ -83,18 +83,8 @@ const AlumnoHeader = ({ alumno, edad, onCambioCinturon, onToggleEstado }) => {
               <Mail size={16} />
               <a href={`mailto:${alumno.email}`}>{alumno.email}</a>
             </div>
-          )}
         </div>
       </div>
-
-      {/* Acciones directas de contacto */}
-      {alumno.telefono && (
-        <div className="profile-actions-bar">
-          <a href={`tel:${alumno.telefono}`} className="btn-secondary flex-center" style={{ textDecoration: 'none' }}>
-            <Phone size={16} style={{ marginRight: '6px' }} /> Llamar
-          </a>
-        </div>
-      )}
     </div>
   );
 };
