@@ -5,22 +5,63 @@ import logoImg from '../assets/logo.png';
 
 let cachedLogoElement = null;
 
-const getLogoImageElement = () => {
-  return new Promise((resolve) => {
-    if (cachedLogoElement) {
-      return resolve(cachedLogoElement);
+// Precargar la imagen inmediatamente si está en caché o disponible
+try {
+  const preloadImg = new Image();
+  preloadImg.onload = () => {
+    if (preloadImg.naturalWidth > 0) {
+      cachedLogoElement = preloadImg;
     }
+  };
+  preloadImg.src = logoImg;
+} catch (e) {
+  // Ignorar errores de precarga inicial
+}
+
+const getLogoImageElement = () => {
+  if (cachedLogoElement) {
+    return Promise.resolve(cachedLogoElement);
+  }
+
+  return new Promise((resolve) => {
+    // Temporizador de seguridad: si en 300ms la imagen no ha cargado (ej. sin wifi/offline), usar fallback de texto sin bloquear
+    const timer = setTimeout(() => {
+      resolve(null);
+    }, 300);
+
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
     img.onload = () => {
-      cachedLogoElement = img;
-      resolve(img);
+      clearTimeout(timer);
+      if (img.naturalWidth > 0) {
+        cachedLogoElement = img;
+        resolve(img);
+      } else {
+        resolve(null);
+      }
     };
     img.onerror = () => {
+      clearTimeout(timer);
       resolve(null);
     };
     img.src = logoImg;
   });
+};
+
+const guardarDocumentoPDF = (doc, nombreArchivo) => {
+  try {
+    doc.save(nombreArchivo);
+  } catch (err) {
+    console.warn('Fallback de descarga PDF:', err);
+    const pdfBlob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  }
 };
 
 const renderPdfHeaderLogo = async (doc) => {
@@ -31,7 +72,7 @@ const renderPdfHeaderLogo = async (doc) => {
     const width = height * aspect;
     doc.addImage(logoElement, 'PNG', 14, 4.5, width, height);
   } else {
-    // Fallback a texto en caso de fallo de carga de imagen
+    // Fallback a texto en caso de fallo de carga de imagen u offline
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -176,7 +217,7 @@ export const exportarMesAPdf = async ({
   });
 
   // 5. Descarga directa del archivo PDF
-  doc.save(nombreArchivo);
+  guardarDocumentoPDF(doc, nombreArchivo);
   return { exito: true, metodo: 'download' };
 };
 
@@ -418,7 +459,7 @@ export const exportarBalanceFinancieroPDF = async ({
   }
 
   // Descarga directa del archivo PDF
-  doc.save(nombreArchivo);
+  guardarDocumentoPDF(doc, nombreArchivo);
   return { exito: true, metodo: 'download' };
 };
 
