@@ -55,3 +55,88 @@ export const getNombreCompleto = (alumno) => {
   if (typeof alumno.nombreCompleto === 'string') return alumno.nombreCompleto;
   return `${alumno.nombre || ''} ${alumno.apellidos || ''}`.trim();
 };
+
+const DIAS_ABREV_MAP = {
+  'lunes': 'L',
+  'martes': 'M',
+  'miércoles': 'X',
+  'miercoles': 'X',
+  'jueves': 'J',
+  'viernes': 'V',
+  'sábado': 'S',
+  'sabado': 'S',
+  'domingo': 'D'
+};
+
+/**
+ * Convierte el nombre de un día a su abreviatura (L, M, X, J, V, S, D)
+ * @param {string} diaStr 
+ * @returns {string}
+ */
+export const abreviarDia = (diaStr) => {
+  if (!diaStr) return '';
+  const key = String(diaStr).trim().toLowerCase();
+  return DIAS_ABREV_MAP[key] || diaStr.charAt(0).toUpperCase();
+};
+
+/**
+ * Formatea los horarios de un grupo en una cadena resumida (ej: "L, X 17:00-18:00")
+ * @param {object} grupo 
+ * @returns {string}
+ */
+export const formatGrupoHorarios = (grupo) => {
+  if (!grupo) return '';
+  if (!grupo.horarios) return 'Sin horarios';
+
+  if (typeof grupo.horarios === 'string') {
+    let str = grupo.horarios;
+    Object.entries(DIAS_ABREV_MAP).forEach(([full, abrev]) => {
+      const reg = new RegExp(`\\b${full}\\b`, 'gi');
+      str = str.replace(reg, abrev);
+    });
+    return str || 'Sin horarios';
+  }
+
+  if (Array.isArray(grupo.horarios) && grupo.horarios.length > 0) {
+    const timeGroups = [];
+    const timeGroupsMap = new Map();
+
+    grupo.horarios.forEach(h => {
+      if (!h) return;
+      if (typeof h === 'string') {
+        timeGroups.push({ timeKey: '', days: [h] });
+        return;
+      }
+      const dayAbrev = abreviarDia(h.dia);
+      const timeKey = h.horaInicio && h.horaFin
+        ? `${h.horaInicio}-${h.horaFin}`
+        : (h.horaInicio || '');
+
+      if (timeKey) {
+        if (!timeGroupsMap.has(timeKey)) {
+          const groupObj = { timeKey, days: [dayAbrev] };
+          timeGroupsMap.set(timeKey, groupObj);
+          timeGroups.push(groupObj);
+        } else {
+          timeGroupsMap.get(timeKey).days.push(dayAbrev);
+        }
+      } else if (dayAbrev) {
+        timeGroups.push({ timeKey: '', days: [dayAbrev] });
+      }
+    });
+
+    const formatted = timeGroups
+      .map(g => {
+        const daysStr = g.days.join(', ');
+        return g.timeKey ? `${daysStr} ${g.timeKey}` : daysStr;
+      })
+      .filter(Boolean)
+      .join(', ');
+
+    return formatted || 'Sin horarios';
+  }
+
+  return 'Sin horarios';
+};
+
+

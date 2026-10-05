@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; //A
 import { Plus } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
