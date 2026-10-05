@@ -62,12 +62,13 @@ export class Alumno {
 }
 
 export class Grupo {
-  constructor({ nombre = '', actividad = '', horarios = '', plazasMax = 0, tarifas = {} } = {}) {
+  constructor({ nombre = '', actividad = '', horarios = '', plazasMax = 0, tarifas = {}, orden = 0 } = {}) {
     this.nombre = nombre;
     this.actividad = actividad;
     this.horarios = horarios;
     this.plazasMax = plazasMax;
     this.tarifas = tarifas; // { "1": 30, "2": 45 }
+    this.orden = orden;
   }
 }
 

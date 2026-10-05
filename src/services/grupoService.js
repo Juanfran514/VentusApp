@@ -2,10 +2,15 @@ import { db, Grupo } from '../db/db';
 
 export const grupoService = {
   /**
-   * Obtiene todos los grupos
+   * Obtiene todos los grupos ordenados por la propiedad orden
    */
   async getAll() {
-    return db.grupos.toArray();
+    const grupos = await db.grupos.toArray();
+    return grupos.sort((a, b) => {
+      const ordenA = a.orden !== undefined ? a.orden : (a.id || 0);
+      const ordenB = b.orden !== undefined ? b.orden : (b.id || 0);
+      return ordenA - ordenB;
+    });
   },
 
   /**
@@ -17,14 +22,30 @@ export const grupoService = {
   },
 
   /**
-   * Crea un nuevo grupo
+   * Crea un nuevo grupo asignándole el siguiente índice de orden
    */
   async create(data) {
+    const all = await db.grupos.toArray();
+    const maxOrden = all.reduce((max, g) => Math.max(max, g.orden !== undefined ? g.orden : (g.id || 0)), 0);
     const grupoInstance = new Grupo({
       ...data,
+      orden: data.orden !== undefined ? data.orden : maxOrden + 1,
       plazasMax: Number(data.plazasMax) || 0
     });
     return db.grupos.add(grupoInstance);
+  },
+
+  /**
+   * Reordena de forma masiva los grupos en la base de datos
+   */
+  async reordenarGrupos(items) {
+    return db.transaction('rw', db.grupos, async () => {
+      for (const item of items) {
+        if (item.id) {
+          await db.grupos.update(Number(item.id), { orden: Number(item.orden) });
+        }
+      }
+    });
   },
 
   /**

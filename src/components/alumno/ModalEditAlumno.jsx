@@ -3,7 +3,7 @@ import Modal from '../ui/Modal';
 import { X } from 'lucide-react';
 import { CINTURONES_DISPONIBLES, normalizarCinturon } from '../../utils/cinturones';
 import { grupoService } from '../../services/grupoService';
-import { formatCurrency, getNombreCompleto } from '../../utils/formatters';
+import { formatCurrency, getNombreCompleto, formatGrupoHorarios } from '../../utils/formatters';
 
 const ModalEditAlumno = ({
   isOpen,
@@ -206,7 +206,7 @@ const ModalEditAlumno = ({
                 >
                   <option value="">Selecciona un grupo...</option>
                   {grupos.map(g => (
-                    <option key={g.id} value={g.id}>{g.nombre} ({g.actividad})</option>
+                    <option key={g.id} value={g.id}>{g.nombre} ({formatGrupoHorarios(g)})</option>
                   ))}
                 </select>
                 <div className="dias-input">

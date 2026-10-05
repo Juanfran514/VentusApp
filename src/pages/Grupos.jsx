@@ -4,7 +4,7 @@ import { grupoService } from '../services/grupoService';
 import { alumnoService } from '../services/alumnoService';
 import Modal from '../components/ui/Modal';
 import SearchFilterBar from '../components/common/SearchFilterBar';
-import { Plus, Edit2, Trash2, X, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Users, GripVertical } from 'lucide-react';
 import { DEFAULT_CATEGORIAS_GRUPOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
 import { getNombreCompleto } from '../utils/formatters';
 import '../pages/Alumnos.css';
@@ -17,6 +17,9 @@ const Grupos = () => {
   const [search, setSearch] = useState('');
   const [filtroActividad, setFiltroActividad] = useState('');
   const [editingId, setEditingId] = useState(null);
+
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -48,6 +51,69 @@ const Grupos = () => {
       return matchSearch && matchActividad;
     });
   }, [gruposConOcupacion, search, filtroActividad]);
+
+  const handleDropSwap = async (fromIdx, toIdx) => {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    if (fromIdx < 0 || fromIdx >= gruposFiltrados.length) return;
+    if (toIdx < 0 || toIdx >= gruposFiltrados.length) return;
+
+    const grupoA = gruposFiltrados[fromIdx];
+    const grupoB = gruposFiltrados[toIdx];
+
+    const currentList = gruposConOcupacion.map((g, idx) => ({
+      id: g.id,
+      orden: g.orden !== undefined ? g.orden : idx + 1
+    }));
+
+    const idxA = currentList.findIndex(g => g.id === grupoA.id);
+    const idxB = currentList.findIndex(g => g.id === grupoB.id);
+
+    if (idxA !== -1 && idxB !== -1) {
+      const [movedItem] = currentList.splice(idxA, 1);
+      currentList.splice(idxB, 0, movedItem);
+
+      currentList.forEach((g, i) => {
+        g.orden = i + 1;
+      });
+
+      await grupoService.reordenarGrupos(currentList);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleTouchStart = (idx) => {
+    setDraggedIndex(idx);
+    setDragOverIndex(idx);
+  };
+
+  const handleTouchMove = (e) => {
+    if (draggedIndex === null) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!targetEl) return;
+    const rowEl = targetEl.closest('[data-row-index]');
+    if (rowEl) {
+      const targetIdx = Number(rowEl.getAttribute('data-row-index'));
+      if (!isNaN(targetIdx) && targetIdx !== dragOverIndex) {
+        setDragOverIndex(targetIdx);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      handleDropSwap(draggedIndex, dragOverIndex);
+    } else {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -206,6 +272,7 @@ const Grupos = () => {
           <table>
             <thead>
               <tr>
+                <th style={{ width: '40px', textAlign: 'center' }}></th>
                 <th>Nombre</th>
                 <th>Actividad</th>
                 <th>Horarios</th>
@@ -214,17 +281,69 @@ const Grupos = () => {
               </tr>
             </thead>
             <tbody>
-              {gruposFiltrados.map(grupo => (
-                <tr key={grupo.id}>
+              {gruposFiltrados.map((grupo, idx) => (
+                <tr
+                  key={grupo.id}
+                  data-row-index={idx}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', String(idx));
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDraggedIndex(idx);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverIndex !== idx) {
+                      setDragOverIndex(idx);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const fromIdx = Number(e.dataTransfer.getData('text/plain'));
+                    handleDropSwap(isNaN(fromIdx) || fromIdx < 0 ? draggedIndex : fromIdx, idx);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedIndex(null);
+                    setDragOverIndex(null);
+                  }}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  style={{
+                    opacity: draggedIndex === idx ? 0.4 : 1,
+                    backgroundColor: dragOverIndex === idx && draggedIndex !== idx ? 'rgba(79, 70, 229, 0.1)' : undefined,
+                    borderTop: dragOverIndex === idx && draggedIndex !== idx && idx < draggedIndex ? '2px solid var(--primary-color)' : undefined,
+                    borderBottom: dragOverIndex === idx && draggedIndex !== idx && idx > draggedIndex ? '2px solid var(--primary-color)' : undefined,
+                    transition: 'background-color 0.15s ease, opacity 0.15s ease'
+                  }}
+                >
+                  <td style={{ textAlign: 'center', width: '40px', padding: '8px 4px' }}>
+                    <div
+                      title="Mantén pulsado y arrastra para reordenar"
+                      onTouchStart={() => handleTouchStart(idx)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '6px',
+                        cursor: 'grab',
+                        touchAction: 'none',
+                        color: 'var(--text-muted)',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <GripVertical size={20} />
+                    </div>
+                  </td>
                   <td><strong>{grupo.nombre}</strong></td>
                   <td>{grupo.actividad}</td>
                   <td>
                     {Array.isArray(grupo.horarios)
                       ? grupo.horarios.map((h, i) => (
-                          <div key={i} style={{ fontSize: '0.85em' }}>
-                            {h.dia.substring(0, 3)} {h.horaInicio}-{h.horaFin}
-                          </div>
-                        ))
+                        <div key={i} style={{ fontSize: '0.85em' }}>
+                          {h.dia.substring(0, 3)} {h.horaInicio}-{h.horaFin}
+                        </div>
+                      ))
                       : grupo.horarios}
                   </td>
                   <td>
@@ -247,7 +366,7 @@ const Grupos = () => {
               ))}
               {gruposFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="text-center">No se encontraron grupos.</td>
+                  <td colSpan="6" className="text-center">No se encontraron grupos.</td>
                 </tr>
               )}
             </tbody>
@@ -259,15 +378,15 @@ const Grupos = () => {
         <form onSubmit={handleSubmit} className="form-grid">
           <div className="form-group">
             <label>Nombre del Grupo *</label>
-            <input name="nombre" value={formData.nombre} onChange={handleInputChange} required placeholder="Ej: Infantil L-X" />
+            <input name="nombre" value={formData.nombre} onChange={handleInputChange} required placeholder="Ej: Infantil" />
           </div>
           <div className="form-group">
             <label>Actividad / Categoría *</label>
-            <input 
-              name="actividad" 
-              value={formData.actividad} 
-              onChange={handleInputChange} 
-              required 
+            <input
+              name="actividad"
+              value={formData.actividad}
+              onChange={handleInputChange}
+              required
               list="actividades-list"
               placeholder="Escribe o selecciona una actividad"
               autoComplete="off"
@@ -283,8 +402,8 @@ const Grupos = () => {
             <div className="inscripciones-list">
               {formData.horariosArray.map((horario, index) => (
                 <div key={index} className="inscripcion-row">
-                  <select 
-                    value={horario.dia} 
+                  <select
+                    value={horario.dia}
                     onChange={(e) => handleHorarioChange(index, 'dia', e.target.value)}
                     required
                   >
@@ -296,21 +415,21 @@ const Grupos = () => {
                     <option value="Sábado">Sábado</option>
                     <option value="Domingo">Domingo</option>
                   </select>
-                  
+
                   <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Inicio:</span>
-                    <input 
-                      type="time" 
-                      value={horario.horaInicio} 
+                    <input
+                      type="time"
+                      value={horario.horaInicio}
                       onChange={(e) => handleHorarioChange(index, 'horaInicio', e.target.value)}
                       required
                     />
                   </div>
                   <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Fin:</span>
-                    <input 
-                      type="time" 
-                      value={horario.horaFin} 
+                    <input
+                      type="time"
+                      value={horario.horaFin}
                       onChange={(e) => handleHorarioChange(index, 'horaFin', e.target.value)}
                       required
                     />
@@ -337,22 +456,22 @@ const Grupos = () => {
                 <div key={index} className="inscripcion-row">
                   <div className="dias-input">
                     <span>Días/sem:</span>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      max="7" 
-                      value={tarifa.dias} 
+                    <input
+                      type="number"
+                      min="1"
+                      max="7"
+                      value={tarifa.dias}
                       onChange={(e) => handleTarifaChange(index, 'dias', e.target.value)}
                       required
                     />
                   </div>
                   <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Precio (€):</span>
-                    <input 
-                      type="number" 
-                      min="0" 
+                    <input
+                      type="number"
+                      min="0"
                       step="0.01"
-                      value={tarifa.importe} 
+                      value={tarifa.importe}
                       onChange={(e) => handleTarifaChange(index, 'importe', e.target.value)}
                       required
                     />
@@ -368,7 +487,7 @@ const Grupos = () => {
             </div>
             <small className="text-muted">Ejemplo: 2 días = 40€, 3 días = 50€. Estas tarifas se usarán para calcular la cuota de los alumnos automáticamente.</small>
           </div>
-          
+
           <div className="form-actions full-width">
             <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
             <button type="submit" className="btn-primary">{editingId ? "Actualizar Grupo" : "Guardar Grupo"}</button>

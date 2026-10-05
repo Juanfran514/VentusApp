@@ -7,7 +7,7 @@ import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/common/StatusBadge';
 import { Plus, Edit2, Trash2, X, Eye } from 'lucide-react';
 import { CINTURONES, normalizarCinturon } from '../utils/cinturones';
-import { formatCurrency, getNombreCompleto } from '../utils/formatters';
+import { formatCurrency, getNombreCompleto, formatGrupoHorarios } from '../utils/formatters';
 import './Alumnos.css';
 
 const Alumnos = () => {
@@ -302,7 +302,7 @@ const Alumnos = () => {
                   >
                     <option value="">Selecciona un grupo...</option>
                     {gruposDisponibles?.map(g => (
-                      <option key={g.id} value={g.id}>{g.nombre} ({g.actividad})</option>
+                      <option key={g.id} value={g.id}>{g.nombre} ({formatGrupoHorarios(g)})</option>
                     ))}
                   </select>
                   
