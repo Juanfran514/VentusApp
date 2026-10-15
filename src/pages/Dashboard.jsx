@@ -311,7 +311,6 @@ const Dashboard = () => {
     return VIBRANT_PALETTE[colorIndex] || VIBRANT_PALETTE[index % VIBRANT_PALETTE.length];
   };
 
-  const COLORS = VIBRANT_PALETTE;
   const mesSeleccionadoNombre = meses.find(m => m.value === selectedMonth)?.label || '';
 
   return (
