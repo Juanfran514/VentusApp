@@ -33,14 +33,15 @@ const AlumnoHeader = ({ alumno, edad, onCambioCinturon, onToggleEstado }) => {
           {/* Grado / Cinturón con selector rápido */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span className={`belt-tag ${beltClass}`}>
-              <Award size={16} /> {normalizarCinturon(alumno.cinturon) || 'Blanco'}
+              <Award size={16} /> {normalizarCinturon(alumno.cinturon) || 'Sin cinturón'}
             </span>
             <select
-              value={normalizarCinturon(alumno.cinturon) || 'Blanco'}
+              value={normalizarCinturon(alumno.cinturon) || ''}
               onChange={(e) => onCambioCinturon(e.target.value)}
               style={{ width: 'auto', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
               title="Cambiar cinturón rápidamente"
             >
+              <option value="">Sin cinturón</option>
               {CINTURONES_DISPONIBLES.map(c => (
                 <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
               ))}

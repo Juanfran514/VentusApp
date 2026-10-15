@@ -32,8 +32,9 @@ export const CINTURONES_DISPONIBLES = [
  * Normaliza nombres anteriores (con Gup o Dan) a nombres limpios solo con colores
  */
 export const normalizarCinturon = (cinturon) => {
-  if (!cinturon) return 'Blanco';
+  if (!cinturon) return '';
   const c = cinturon.toLowerCase().trim();
+  if (c === 'sin cinturón' || c === 'sin cinturon' || c === 'ninguno' || c === 'none' || c === '-' || c === '') return '';
   if (c.includes('blanco') && (c.includes('amarill') || c.includes('9'))) return 'Blanco - Amarillo';
   if (c.includes('blanco')) return 'Blanco';
   if (c.includes('amarill') && (c.includes('verd') || c.includes('7'))) return 'Amarillo - Verde';
@@ -52,8 +53,9 @@ export const normalizarCinturon = (cinturon) => {
  * Devuelve la clase CSS correspondiente según el color del cinturón
  */
 export const getBeltClass = (cinturon) => {
-  if (!cinturon) return 'belt-blanco';
-  const c = cinturon.toLowerCase();
+  if (!cinturon) return 'belt-ninguno';
+  const c = cinturon.toLowerCase().trim();
+  if (c === 'sin cinturón' || c === 'sin cinturon' || c === 'ninguno' || c === 'none' || c === '-' || c === '') return 'belt-ninguno';
   if (c.includes('blanco') && (c.includes('amarill') || c.includes('9'))) return 'belt-blanco-amarillo';
   if (c.includes('blanco')) return 'belt-blanco';
   if (c.includes('amarill') && (c.includes('verd') || c.includes('7'))) return 'belt-amarillo-verde';
@@ -70,5 +72,5 @@ export const getBeltClass = (cinturon) => {
   if (c.includes('roj') && (c.includes('negr') || c.includes('1'))) return 'belt-rojo-negro';
   if (c.includes('roj')) return 'belt-rojo';
   if (c.includes('negr') || c.includes('dan')) return 'belt-negro';
-  return 'belt-blanco';
+  return 'belt-ninguno';
 };

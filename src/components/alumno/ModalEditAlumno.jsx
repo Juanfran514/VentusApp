@@ -20,7 +20,7 @@ const ModalEditAlumno = ({
     telefono: '',
     nTutor: '',
     email: '',
-    cinturon: 'Blanco',
+    cinturon: '',
     cuota: 0,
     estado: 'activo',
     inscripciones: [],
@@ -37,7 +37,7 @@ const ModalEditAlumno = ({
         telefono: alumno.telefono || '',
         nTutor: alumno.nTutor || '',
         email: alumno.email || '',
-        cinturon: normalizarCinturon(alumno.cinturon) || 'Blanco',
+        cinturon: alumno.cinturon ? normalizarCinturon(alumno.cinturon) : '',
         cuota: alumno.cuota !== undefined ? alumno.cuota : 0,
         estado: alumno.estado || 'activo',
         inscripciones: alumno.inscripciones || [],
@@ -173,9 +173,10 @@ const ModalEditAlumno = ({
           <label>Cinturón</label>
           <select
             name="cinturon"
-            value={normalizarCinturon(formData.cinturon) || 'Blanco'}
+            value={formData.cinturon ? normalizarCinturon(formData.cinturon) : ''}
             onChange={handleInputChange}
           >
+            <option value="">Sin cinturón</option>
             {CINTURONES_DISPONIBLES.map(c => (
               <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
             ))}

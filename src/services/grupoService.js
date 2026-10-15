@@ -72,13 +72,167 @@ export const grupoService = {
         if (alumno.inscripciones && alumno.inscripciones.some(ins => Number(ins.grupoId) === numId)) {
           const updatedInscripciones = alumno.inscripciones.filter(ins => Number(ins.grupoId) !== numId);
           const newCuota = grupoService.calcularCuotaTotal(updatedInscripciones, gruposMap);
+          const gruposIds = updatedInscripciones.map(ins => Number(ins.grupoId));
+          const primaryGrupoId = updatedInscripciones.length > 0 ? Number(updatedInscripciones[0].grupoId) : null;
           await db.alumnos.update(alumno.id, {
             inscripciones: updatedInscripciones,
+            grupos: gruposIds,
+            grupoId: primaryGrupoId,
             cuota: newCuota
           });
         }
       }
       await db.grupos.delete(numId);
+    });
+  },
+
+  /**
+   * Inscribe o actualiza los días de un alumno en un grupo
+   */
+  async inscribirAlumno(grupoId, alumnoId, dias = 1) {
+    const numGroupId = Number(grupoId);
+    const numAlumnoId = Number(alumnoId);
+    const numDias = Math.max(1, Number(dias) || 1);
+
+    return db.transaction('rw', [db.grupos, db.alumnos], async () => {
+      const alumno = await db.alumnos.get(numAlumnoId);
+      if (!alumno) throw new Error('Alumno no encontrado');
+
+      const allGrupos = await db.grupos.toArray();
+      const gruposMap = allGrupos.reduce((acc, g) => { acc[g.id] = g; return acc; }, {});
+
+      const currentInscripciones = Array.isArray(alumno.inscripciones) ? [...alumno.inscripciones] : [];
+      const existingIndex = currentInscripciones.findIndex(ins => Number(ins.grupoId) === numGroupId);
+
+      if (existingIndex >= 0) {
+        currentInscripciones[existingIndex] = { ...currentInscripciones[existingIndex], dias: numDias };
+      } else {
+        currentInscripciones.push({ grupoId: numGroupId, dias: numDias });
+      }
+
+      const prevCalc = grupoService.calcularCuotaTotal(alumno.inscripciones || [], gruposMap);
+      const newCalc = grupoService.calcularCuotaTotal(currentInscripciones, gruposMap);
+      const shouldAutoUpdate = alumno.cuota === 0 || alumno.cuota === '' || Number(alumno.cuota) === Number(prevCalc);
+      const diff = newCalc - prevCalc;
+      const newCuota = shouldAutoUpdate ? newCalc : Math.max(0, Number(alumno.cuota || 0) + diff);
+
+      const gruposIds = currentInscripciones.map(ins => Number(ins.grupoId));
+      const primaryGrupoId = currentInscripciones.length > 0 ? Number(currentInscripciones[0].grupoId) : null;
+
+      await db.alumnos.update(numAlumnoId, {
+        inscripciones: currentInscripciones,
+        grupos: gruposIds,
+        grupoId: primaryGrupoId,
+        cuota: newCuota
+      });
+    });
+  },
+
+  /**
+   * Desinscribe a un alumno de un grupo
+   */
+  async desinscribirAlumno(grupoId, alumnoId) {
+    const numGroupId = Number(grupoId);
+    const numAlumnoId = Number(alumnoId);
+
+    return db.transaction('rw', [db.grupos, db.alumnos], async () => {
+      const alumno = await db.alumnos.get(numAlumnoId);
+      if (!alumno) return;
+
+      const allGrupos = await db.grupos.toArray();
+      const gruposMap = allGrupos.reduce((acc, g) => { acc[g.id] = g; return acc; }, {});
+
+      const currentInscripciones = Array.isArray(alumno.inscripciones) ? [...alumno.inscripciones] : [];
+      const updatedInscripciones = currentInscripciones.filter(ins => Number(ins.grupoId) !== numGroupId);
+
+      const prevCalc = grupoService.calcularCuotaTotal(currentInscripciones, gruposMap);
+      const newCalc = grupoService.calcularCuotaTotal(updatedInscripciones, gruposMap);
+      const shouldAutoUpdate = alumno.cuota === 0 || alumno.cuota === '' || Number(alumno.cuota) === Number(prevCalc);
+      const diff = newCalc - prevCalc;
+      const newCuota = shouldAutoUpdate ? newCalc : Math.max(0, Number(alumno.cuota || 0) + diff);
+
+      const gruposIds = updatedInscripciones.map(ins => Number(ins.grupoId));
+      const primaryGrupoId = updatedInscripciones.length > 0 ? Number(updatedInscripciones[0].grupoId) : null;
+
+      await db.alumnos.update(numAlumnoId, {
+        inscripciones: updatedInscripciones,
+        grupos: gruposIds,
+        grupoId: primaryGrupoId,
+        cuota: newCuota
+      });
+    });
+  },
+
+  /**
+   * Sincroniza la lista completa de alumnos asignados a un grupo
+   * @param {number} grupoId
+   * @param {Array<{alumnoId: number|string, dias: number|string}>} alumnosInscripciones
+   */
+  async sincronizarAlumnosGrupo(grupoId, alumnosInscripciones = []) {
+    const numGroupId = Number(grupoId);
+
+    return db.transaction('rw', [db.grupos, db.alumnos], async () => {
+      const allAlumnos = await db.alumnos.toArray();
+      const allGrupos = await db.grupos.toArray();
+      const gruposMap = allGrupos.reduce((acc, g) => { acc[g.id] = g; return acc; }, {});
+
+      const targetMap = new Map();
+      alumnosInscripciones.forEach(item => {
+        if (item && item.alumnoId) {
+          targetMap.set(Number(item.alumnoId), Math.max(1, Number(item.dias) || 1));
+        }
+      });
+
+      for (const alumno of allAlumnos) {
+        const currentInscripciones = Array.isArray(alumno.inscripciones) ? [...alumno.inscripciones] : [];
+        const isCurrentlyIn = currentInscripciones.some(ins => Number(ins.grupoId) === numGroupId);
+        const shouldBeIn = targetMap.has(alumno.id);
+
+        if (shouldBeIn) {
+          const targetDias = targetMap.get(alumno.id);
+          const currentEntry = currentInscripciones.find(ins => Number(ins.grupoId) === numGroupId);
+          if (!currentEntry || currentEntry.dias !== targetDias) {
+            let nextInscripciones;
+            if (currentEntry) {
+              nextInscripciones = currentInscripciones.map(ins => 
+                Number(ins.grupoId) === numGroupId ? { ...ins, dias: targetDias } : ins
+              );
+            } else {
+              nextInscripciones = [...currentInscripciones, { grupoId: numGroupId, dias: targetDias }];
+            }
+            const prevCalc = grupoService.calcularCuotaTotal(currentInscripciones, gruposMap);
+            const newCalc = grupoService.calcularCuotaTotal(nextInscripciones, gruposMap);
+            const shouldAutoUpdate = alumno.cuota === 0 || alumno.cuota === '' || Number(alumno.cuota) === Number(prevCalc);
+            const diff = newCalc - prevCalc;
+            const newCuota = shouldAutoUpdate ? newCalc : Math.max(0, Number(alumno.cuota || 0) + diff);
+            const gruposIds = nextInscripciones.map(ins => Number(ins.grupoId));
+            const primaryGrupoId = nextInscripciones.length > 0 ? Number(nextInscripciones[0].grupoId) : null;
+
+            await db.alumnos.update(alumno.id, {
+              inscripciones: nextInscripciones,
+              grupos: gruposIds,
+              grupoId: primaryGrupoId,
+              cuota: newCuota
+            });
+          }
+        } else if (isCurrentlyIn) {
+          const nextInscripciones = currentInscripciones.filter(ins => Number(ins.grupoId) !== numGroupId);
+          const prevCalc = grupoService.calcularCuotaTotal(currentInscripciones, gruposMap);
+          const newCalc = grupoService.calcularCuotaTotal(nextInscripciones, gruposMap);
+          const shouldAutoUpdate = alumno.cuota === 0 || alumno.cuota === '' || Number(alumno.cuota) === Number(prevCalc);
+          const diff = newCalc - prevCalc;
+          const newCuota = shouldAutoUpdate ? newCalc : Math.max(0, Number(alumno.cuota || 0) + diff);
+          const gruposIds = nextInscripciones.map(ins => Number(ins.grupoId));
+          const primaryGrupoId = nextInscripciones.length > 0 ? Number(nextInscripciones[0].grupoId) : null;
+
+          await db.alumnos.update(alumno.id, {
+            inscripciones: nextInscripciones,
+            grupos: gruposIds,
+            grupoId: primaryGrupoId,
+            cuota: newCuota
+          });
+        }
+      }
     });
   },
 

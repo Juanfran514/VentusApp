@@ -189,10 +189,10 @@ th {
   overflow-y: auto;
 }
 
-/* RESPONSIVE DESIGN - iPad Pro (Vertical) & Tablets */
+/* RESPONSIVE DESIGN - iPad, iPad Air, iPad Pro & Tablets (601px - 1024px) */
 @media (max-width: 1024px) {
   .sidebar {
-    width: 70px;
+    width: 76px;
     align-items: center;
   }
   
@@ -211,19 +211,34 @@ th {
   
   .nav-link {
     justify-content: center;
-    padding: 1rem;
+    padding: 1.15rem 0.75rem;
+    min-height: 48px;
   }
   
   .nav-text {
-    display: none; /* Oculta el texto del menú, dejando solo iconos */
+    display: none; /* Oculta el texto del menú, dejando solo iconos grandes táctiles */
+  }
+
+  .sidebar-backup-btn {
+    justify-content: center;
+    padding: 0.75rem;
+  }
+
+  .sidebar-backup-btn span {
+    display: none;
   }
   
   .main-content {
     padding: 1.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table th, table td {
+    padding: 0.85rem 0.75rem;
   }
 }
 
-/* Mobile Devices */
+/* Mobile Devices (< 600px) */
 @media (max-width: 600px) {
   .layout-container {
     flex-direction: column;
@@ -246,9 +261,11 @@ th {
     flex-direction: row;
     overflow-x: auto;
     padding: 0;
+    -webkit-overflow-scrolling: touch;
   }
   
   .nav-link {
     padding: 1rem;
+    min-height: 44px;
   }
 }

@@ -17,7 +17,7 @@ const Alumnos = () => {
 
   const [formData, setFormData] = useState({
     nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-    cinturon: 'Blanco', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+    cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
   });
 
   const gruposDisponibles = useLiveQuery(() => grupoService.getAll()) || [];
@@ -98,7 +98,7 @@ const Alumnos = () => {
   const openNewModal = () => {
     setFormData({
       nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-      cinturon: 'Blanco', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+      cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
     });
     setEditingId(null);
     setIsModalOpen(true);
@@ -112,7 +112,7 @@ const Alumnos = () => {
       telefono: alumno.telefono || '',
       nTutor: alumno.nTutor || '',
       email: alumno.email || '',
-      cinturon: normalizarCinturon(alumno.cinturon) || 'Blanco',
+      cinturon: alumno.cinturon ? normalizarCinturon(alumno.cinturon) : '',
       cuota: alumno.cuota !== undefined ? alumno.cuota : 0,
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
@@ -275,7 +275,8 @@ const Alumnos = () => {
           </div>
           <div className="form-group">
             <label>Cinturón</label>
-            <select name="cinturon" value={normalizarCinturon(formData.cinturon) || 'Blanco'} onChange={handleInputChange}>
+            <select name="cinturon" value={formData.cinturon ? normalizarCinturon(formData.cinturon) : ''} onChange={handleInputChange}>
+              <option value="">Sin cinturón</option>
               {CINTURONES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}

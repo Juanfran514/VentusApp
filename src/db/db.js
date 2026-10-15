@@ -32,7 +32,7 @@ export class Alumno {
     inscripciones = [], // Array de { grupoId: X, dias: Y }
     observaciones = '',
     lesiones = '',
-    cinturon = 'Blanco',
+    cinturon = '',
     email = '',
     fechaAlta = new Date().toISOString()
   } = {}) {

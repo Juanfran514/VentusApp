@@ -37,7 +37,7 @@ export const alumnoService = {
   async create(data) {
     const alumnoInstance = new Alumno({
       ...data,
-      cinturon: normalizarCinturon(data.cinturon) || 'Blanco'
+      cinturon: data.cinturon ? normalizarCinturon(data.cinturon) : ''
     });
     return db.alumnos.add(alumnoInstance);
   },
@@ -48,8 +48,8 @@ export const alumnoService = {
   async update(id, data) {
     const numId = Number(id);
     const updateData = { ...data };
-    if (updateData.cinturon) {
-      updateData.cinturon = normalizarCinturon(updateData.cinturon);
+    if (updateData.cinturon !== undefined) {
+      updateData.cinturon = updateData.cinturon ? normalizarCinturon(updateData.cinturon) : '';
     }
     return db.alumnos.update(numId, updateData);
   },
@@ -75,7 +75,7 @@ export const alumnoService = {
    * Actualiza rápidamente el cinturón de un alumno
    */
   async updateCinturon(id, nuevoCinturon) {
-    const cinturonLimpio = normalizarCinturon(nuevoCinturon);
+    const cinturonLimpio = nuevoCinturon ? normalizarCinturon(nuevoCinturon) : '';
     await db.alumnos.update(Number(id), { cinturon: cinturonLimpio });
     return cinturonLimpio;
   },

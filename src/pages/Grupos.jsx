@@ -6,13 +6,14 @@ import Modal from '../components/ui/Modal';
 import SearchFilterBar from '../components/common/SearchFilterBar';
 import { Plus, Edit2, Trash2, X, Users, GripVertical } from 'lucide-react';
 import { DEFAULT_CATEGORIAS_GRUPOS, getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../utils/categorias';
-import { getNombreCompleto } from '../utils/formatters';
+import { getNombreCompleto, formatCurrency } from '../utils/formatters';
 import '../pages/Alumnos.css';
 
 const Grupos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isListaModalOpen, setIsListaModalOpen] = useState(false);
-  const [selectedGroupForLista, setSelectedGroupForLista] = useState(null);
+  const [selectedGroupIdForLista, setSelectedGroupIdForLista] = useState(null);
+  const [quickAlumnoState, setQuickAlumnoState] = useState({ alumnoId: '', dias: 1 });
 
   const [search, setSearch] = useState('');
   const [filtroActividad, setFiltroActividad] = useState('');
@@ -26,7 +27,8 @@ const Grupos = () => {
     actividad: '',
     horariosArray: [],
     plazasMax: 20,
-    tarifasArray: []
+    tarifasArray: [],
+    alumnosInscritos: []
   });
 
   const alumnosTotales = useLiveQuery(() => alumnoService.getAll()) || [];
@@ -36,6 +38,29 @@ const Grupos = () => {
   const gruposConOcupacion = useMemo(() => {
     return grupoService.calcularOcupacion(gruposRaw, alumnosTotales);
   }, [gruposRaw, alumnosTotales]);
+
+  // Grupo seleccionado actualmente para el modal de gestión de alumnos
+  const selectedGroup = useMemo(() => {
+    return gruposConOcupacion.find(g => g.id === selectedGroupIdForLista) || null;
+  }, [gruposConOcupacion, selectedGroupIdForLista]);
+
+  // Alumnos activos inscritos en el grupo seleccionado
+  const alumnosInscritosEnGrupo = useMemo(() => {
+    if (!selectedGroupIdForLista) return [];
+    return alumnosTotales.filter(a => 
+      a.estado === 'activo' && 
+      a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupIdForLista)
+    );
+  }, [alumnosTotales, selectedGroupIdForLista]);
+
+  // Alumnos activos disponibles para inscribir (que no estén ya en el grupo)
+  const alumnosDisponiblesParaInscribir = useMemo(() => {
+    if (!selectedGroupIdForLista) return [];
+    return alumnosTotales.filter(a => 
+      a.estado === 'activo' && 
+      !a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupIdForLista)
+    );
+  }, [alumnosTotales, selectedGroupIdForLista]);
 
   // Categorías/actividades sugeridas persistentes combinadas con las existentes en la BD
   const actividadesSugeridas = useMemo(() => {
@@ -166,13 +191,38 @@ const Grupos = () => {
     });
   };
 
+  // Alumnos inscritos en modal de creación/edición de grupo
+  const handleAddAlumnoInscrito = () => {
+    const defaultDias = formData.tarifasArray.length > 0 ? Number(formData.tarifasArray[0].dias) : 1;
+    setFormData(prev => ({
+      ...prev,
+      alumnosInscritos: [...prev.alumnosInscritos, { alumnoId: '', dias: defaultDias }]
+    }));
+  };
+
+  const handleRemoveAlumnoInscrito = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      alumnosInscritos: prev.alumnosInscritos.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleAlumnoInscritoChange = (index, field, value) => {
+    setFormData(prev => {
+      const nextList = [...prev.alumnosInscritos];
+      nextList[index] = { ...nextList[index], [field]: value };
+      return { ...prev, alumnosInscritos: nextList };
+    });
+  };
+
   const openNewModal = () => {
     setFormData({
       nombre: '',
       actividad: '',
       horariosArray: [],
       plazasMax: 20,
-      tarifasArray: []
+      tarifasArray: [],
+      alumnosInscritos: []
     });
     setEditingId(null);
     setIsModalOpen(true);
@@ -186,20 +236,76 @@ const Grupos = () => {
       }
     }
 
+    const currentAlumnos = alumnosTotales
+      .filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === grupo.id))
+      .map(a => {
+        const ins = a.inscripciones.find(i => Number(i.grupoId) === grupo.id);
+        return {
+          alumnoId: a.id,
+          dias: ins?.dias || 1
+        };
+      });
+
     setFormData({
       nombre: grupo.nombre || '',
       actividad: grupo.actividad || '',
       horariosArray: Array.isArray(grupo.horarios) ? grupo.horarios : [],
       plazasMax: grupo.plazasMax || 0,
-      tarifasArray: tarifasArray
+      tarifasArray: tarifasArray,
+      alumnosInscritos: currentAlumnos
     });
     setEditingId(grupo.id);
     setIsModalOpen(true);
   };
 
   const openListaModal = (grupo) => {
-    setSelectedGroupForLista(grupo);
+    setSelectedGroupIdForLista(grupo.id);
+    const defaultDias = grupo.tarifas && Object.keys(grupo.tarifas).length > 0 
+      ? Number(Object.keys(grupo.tarifas)[0]) 
+      : 1;
+    setQuickAlumnoState({ alumnoId: '', dias: defaultDias });
     setIsListaModalOpen(true);
+  };
+
+  const handleQuickInscribirAlumno = async () => {
+    if (!quickAlumnoState.alumnoId || !selectedGroupIdForLista) return;
+    try {
+      await grupoService.inscribirAlumno(
+        selectedGroupIdForLista,
+        quickAlumnoState.alumnoId,
+        quickAlumnoState.dias
+      );
+      const defaultDias = selectedGroup?.tarifas && Object.keys(selectedGroup.tarifas).length > 0
+        ? Number(Object.keys(selectedGroup.tarifas)[0])
+        : 1;
+      setQuickAlumnoState({ alumnoId: '', dias: defaultDias });
+    } catch (err) {
+      console.error("Error al inscribir alumno:", err);
+      alert("Hubo un error al inscribir al alumno en el grupo.");
+    }
+  };
+
+  const handleQuickDesinscribir = async (alumno) => {
+    if (!selectedGroupIdForLista || !alumno) return;
+    const confirmMsg = `¿Estás seguro de que deseas desinscribir a ${getNombreCompleto(alumno)} de este grupo? Su cuota mensual se actualizará automáticamente.`;
+    if (window.confirm(confirmMsg)) {
+      try {
+        await grupoService.desinscribirAlumno(selectedGroupIdForLista, alumno.id);
+      } catch (err) {
+        console.error("Error al desinscribir alumno:", err);
+        alert("Hubo un error al desinscribir al alumno.");
+      }
+    }
+  };
+
+  const handleUpdateAlumnoDias = async (alumnoId, newDias) => {
+    if (!selectedGroupIdForLista || !alumnoId) return;
+    try {
+      await grupoService.inscribirAlumno(selectedGroupIdForLista, alumnoId, newDias);
+    } catch (err) {
+      console.error("Error al actualizar días:", err);
+      alert("Hubo un error al actualizar los días del alumno.");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -221,10 +327,21 @@ const Grupos = () => {
         tarifas: tarifasMap
       };
 
+      const validAlumnosInscritos = formData.alumnosInscritos
+        .filter(item => item.alumnoId !== '')
+        .map(item => ({
+          alumnoId: Number(item.alumnoId),
+          dias: Number(item.dias) || 1
+        }));
+
       if (editingId) {
         await grupoService.update(editingId, grupoData);
+        await grupoService.sincronizarAlumnosGrupo(editingId, validAlumnosInscritos);
       } else {
-        await grupoService.create(grupoData);
+        const newId = await grupoService.create(grupoData);
+        if (validAlumnosInscritos.length > 0) {
+          await grupoService.sincronizarAlumnosGrupo(newId, validAlumnosInscritos);
+        }
       }
 
       saveStoredCategoria('grupos', actividadTrimmed, DEFAULT_CATEGORIAS_GRUPOS);
@@ -352,7 +469,7 @@ const Grupos = () => {
                     </span>
                   </td>
                   <td>
-                    <button className="btn-icon text-primary" title="Ver Alumnos" onClick={() => openListaModal(grupo)}>
+                    <button className="btn-icon text-primary" title="Gestionar Alumnos" onClick={() => openListaModal(grupo)}>
                       <Users size={18} />
                     </button>
                     <button className="btn-icon text-muted" title="Editar" onClick={() => openEditModal(grupo)}>
@@ -415,7 +532,6 @@ const Grupos = () => {
                     <option value="Sábado">Sábado</option>
                     <option value="Domingo">Domingo</option>
                   </select>
-
                   <div className="dias-input" style={{ marginLeft: '15px' }}>
                     <span>Inicio:</span>
                     <input
@@ -425,7 +541,7 @@ const Grupos = () => {
                       required
                     />
                   </div>
-                  <div className="dias-input" style={{ marginLeft: '15px' }}>
+                  <div className="dias-input">
                     <span>Fin:</span>
                     <input
                       type="time"
@@ -465,7 +581,7 @@ const Grupos = () => {
                       required
                     />
                   </div>
-                  <div className="dias-input" style={{ marginLeft: '15px' }}>
+                  <div className="dias-input">
                     <span>Precio (€):</span>
                     <input
                       type="number"
@@ -488,6 +604,71 @@ const Grupos = () => {
             <small className="text-muted">Ejemplo: 2 días = 40€, 3 días = 50€. Estas tarifas se usarán para calcular la cuota de los alumnos automáticamente.</small>
           </div>
 
+
+          {/* Sección de alumnos inscritos en el grupo */}
+          <div className="form-group full-width">
+            <label>Alumnos Inscritos</label>
+            <div className="inscripciones-list">
+              {formData.alumnosInscritos.map((item, index) => (
+                <div key={index} className="inscripcion-row">
+                  <select
+                    value={item.alumnoId}
+                    onChange={(e) => handleAlumnoInscritoChange(index, 'alumnoId', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona un alumno...</option>
+                    {alumnosTotales
+                      .filter(a => a.estado === 'activo' || Number(a.id) === Number(item.alumnoId))
+                      .map(a => (
+                        <option 
+                          key={a.id} 
+                          value={a.id}
+                          disabled={formData.alumnosInscritos.some((other, i) => i !== index && Number(other.alumnoId) === Number(a.id))}
+                        >
+                          {getNombreCompleto(a)}
+                        </option>
+                      ))}
+                  </select>
+
+                  <div className="dias-input">
+                    <span>Días/sem:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="7"
+                      value={item.dias}
+                      onChange={(e) => handleAlumnoInscritoChange(index, 'dias', e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-icon text-danger"
+                    title="Quitar alumno"
+                    onClick={() => handleRemoveAlumnoInscrito(index)}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn-secondary add-inscripcion-btn"
+                onClick={handleAddAlumnoInscrito}
+              >
+                + Añadir Alumno
+              </button>
+            </div>
+            <small className="text-muted">
+              {editingId
+                ? 'Puedes añadir o quitar alumnos de este grupo. Se actualizarán automáticamente sus cuotas.'
+                : 'Puedes inscribir alumnos a este grupo desde su creación. También podrás gestionarlos más adelante.'}
+            </small>
+          </div>
+          
+
           <div className="form-actions full-width">
             <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
             <button type="submit" className="btn-primary">{editingId ? "Actualizar Grupo" : "Guardar Grupo"}</button>
@@ -495,38 +676,162 @@ const Grupos = () => {
         </form>
       </Modal>
 
-      {/* Modal Lista de Alumnos */}
-      <Modal isOpen={isListaModalOpen} onClose={() => setIsListaModalOpen(false)} title={`Alumnos en: ${selectedGroupForLista?.nombre || ''}`}>
-        <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+      {/* Modal Gestión de Alumnos del Grupo */}
+      <Modal 
+        isOpen={isListaModalOpen} 
+        onClose={() => setIsListaModalOpen(false)} 
+        title={`Alumnos en: ${selectedGroup?.nombre || ''}`}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              <strong>Actividad:</strong> {selectedGroup?.actividad || '-'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Plazas:</span>
+            <span className={`badge ${(selectedGroup?.plazasOcupadas || 0) >= (selectedGroup?.plazasMax || 0) ? 'badge-baja' : 'badge-activo'}`}>
+              {selectedGroup?.plazasOcupadas || 0} / {selectedGroup?.plazasMax || 0} ocupadas
+            </span>
+          </div>
+        </div>
+
+        {/* Formulario rápido para añadir alumno */}
+        <div style={{
+          backgroundColor: 'var(--bg-dark)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1.5rem'
+        }}>
+          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-light)' }}>
+            + Inscribir alumno a este grupo
+          </label>
+          
+          {alumnosDisponiblesParaInscribir.length > 0 ? (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1', minWidth: '180px' }}>
+                <select
+                  value={quickAlumnoState.alumnoId}
+                  onChange={(e) => setQuickAlumnoState(prev => ({ ...prev, alumnoId: e.target.value }))}
+                >
+                  <option value="">Selecciona un alumno...</option>
+                  {alumnosDisponiblesParaInscribir.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {getNombreCompleto(a)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="dias-input" style={{ width: 'auto' }}>
+                <span>Días/sem:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="7"
+                  style={{ width: '60px' }}
+                  value={quickAlumnoState.dias}
+                  onChange={(e) => setQuickAlumnoState(prev => ({ ...prev, dias: Number(e.target.value) || 1 }))}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="btn-primary flex-center"
+                disabled={!quickAlumnoState.alumnoId}
+                onClick={handleQuickInscribirAlumno}
+                style={{ opacity: !quickAlumnoState.alumnoId ? 0.6 : 1, whiteSpace: 'nowrap' }}
+              >
+                <Plus size={16} style={{ marginRight: '6px' }} />
+                Inscribir
+              </button>
+            </div>
+          ) : (
+            <p className="text-muted" style={{ fontSize: '0.875rem', margin: 0 }}>
+              {alumnosTotales.filter(a => a.estado === 'activo').length === 0
+                ? 'No hay alumnos activos registrados en la aplicación.'
+                : 'Todos los alumnos activos ya están inscritos en este grupo.'}
+            </p>
+          )}
+
+          {selectedGroup?.tarifas && Object.keys(selectedGroup.tarifas).length > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Tarifas: {Object.entries(selectedGroup.tarifas).map(([dias, precio]) => `${dias}d: ${formatCurrency(precio)}`).join(' • ')}
+            </div>
+          )}
+        </div>
+
+        {/* Tabla de alumnos inscritos */}
+        <div className="table-container" style={{ maxHeight: '380px', overflowY: 'auto' }}>
           <table style={{ marginBottom: 0 }}>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Días Inscriptos</th>
+                <th>Alumno</th>
+                <th>Días/sem</th>
+                <th>Tarifa Est.</th>
                 <th>Teléfono</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {alumnosTotales.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).map(alumno => {
-                const ins = alumno.inscripciones.find(i => Number(i.grupoId) === selectedGroupForLista.id);
+              {alumnosInscritosEnGrupo.map(alumno => {
+                const ins = alumno.inscripciones?.find(i => Number(i.grupoId) === selectedGroupIdForLista);
+                const tarifa = selectedGroup?.tarifas ? selectedGroup.tarifas[ins?.dias] : null;
                 return (
                   <tr key={alumno.id}>
-                    <td><strong>{getNombreCompleto(alumno)}</strong></td>
-                    <td>{ins?.dias} días/sem</td>
+                    <td>
+                      <strong>{getNombreCompleto(alumno)}</strong>
+                    </td>
+                    <td>
+                      <select
+                        value={ins?.dias || 1}
+                        onChange={(e) => handleUpdateAlumnoDias(alumno.id, Number(e.target.value))}
+                        style={{ width: '85px', padding: '3px 6px', fontSize: '0.85em' }}
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7].map(d => (
+                          <option key={d} value={d}>
+                            {d} {d === 1 ? 'día' : 'días'}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      {tarifa !== undefined && tarifa !== null ? formatCurrency(tarifa) : '-'}
+                    </td>
                     <td>{alumno.telefono || '-'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn-icon text-danger"
+                        title="Desinscribir del grupo"
+                        onClick={() => handleQuickDesinscribir(alumno)}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
-              {alumnosTotales.filter(a => a.estado === 'activo' && a.inscripciones?.some(ins => Number(ins.grupoId) === selectedGroupForLista?.id)).length === 0 && (
+              {alumnosInscritosEnGrupo.length === 0 && (
                 <tr>
-                  <td colSpan="3" className="text-center">No hay alumnos activos inscritos en este grupo.</td>
+                  <td colSpan="5" className="text-center" style={{ padding: '2rem 1rem' }}>
+                    <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                      No hay alumnos inscritos en este grupo todavía.
+                    </p>
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Usa el formulario de arriba para añadir alumnos.
+                    </small>
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="form-actions full-width" style={{ marginTop: '15px' }}>
-          <button type="button" className="btn-primary" onClick={() => setIsListaModalOpen(false)}>Cerrar</button>
+
+        <div className="form-actions full-width" style={{ marginTop: '1.25rem' }}>
+          <button type="button" className="btn-primary" onClick={() => setIsListaModalOpen(false)}>
+            Cerrar
+          </button>
         </div>
       </Modal>
     </div>
