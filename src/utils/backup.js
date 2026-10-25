@@ -24,23 +24,29 @@ export const exportarCopiaSeguridad = async () => {
   const grupos = await db.grupos.toArray();
   const pagos = await db.pagos.toArray();
   const gastos = await db.gastos.toArray();
+  const gastosFijos = db.gastosFijos ? await db.gastosFijos.toArray() : [];
 
   const categoriasGastos = localStorage.getItem('ventus_cat_gastos');
+  const categoriasGastosVariables = localStorage.getItem('ventus_cat_gastos_variables');
+  const categoriasGastosFijos = localStorage.getItem('ventus_cat_gastos_fijos');
   const categoriasGrupos = localStorage.getItem('ventus_cat_grupos');
   const categoriasMaterial = localStorage.getItem('ventus_cat_material');
   const categoriasLicencias = localStorage.getItem('ventus_cat_licencias');
 
   const backupData = {
     app: 'VentusApp',
-    version: 1,
+    version: 2,
     fecha: new Date().toISOString(),
     data: {
       alumnos,
       grupos,
       pagos,
       gastos,
+      gastosFijos,
       categorias: {
         gastos: categoriasGastos ? JSON.parse(categoriasGastos) : [],
+        gastos_variables: categoriasGastosVariables ? JSON.parse(categoriasGastosVariables) : [],
+        gastos_fijos: categoriasGastosFijos ? JSON.parse(categoriasGastosFijos) : [],
         grupos: categoriasGrupos ? JSON.parse(categoriasGrupos) : [],
         material: categoriasMaterial ? JSON.parse(categoriasMaterial) : [],
         licencias: categoriasLicencias ? JSON.parse(categoriasLicencias) : []
@@ -91,33 +97,45 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
     throw new Error('El archivo no contiene datos válidos de VentusApp.');
   }
 
-  const { alumnos = [], grupos = [], pagos = [], gastos = [], categorias = {} } = backupData.data;
+  const { alumnos = [], grupos = [], pagos = [], gastos = [], gastosFijos = [], categorias = {} } = backupData.data;
+
+  const stores = [db.alumnos, db.grupos, db.pagos, db.gastos];
+  if (db.gastosFijos) stores.push(db.gastosFijos);
 
   if (modo === 'reemplazar') {
-    await db.transaction('rw', [db.alumnos, db.grupos, db.pagos, db.gastos], async () => {
+    await db.transaction('rw', stores, async () => {
       await db.alumnos.clear();
       await db.grupos.clear();
       await db.pagos.clear();
       await db.gastos.clear();
+      if (db.gastosFijos) await db.gastosFijos.clear();
 
       if (alumnos.length) await db.alumnos.bulkAdd(alumnos);
       if (grupos.length) await db.grupos.bulkAdd(grupos);
       if (pagos.length) await db.pagos.bulkAdd(pagos);
       if (gastos.length) await db.gastos.bulkAdd(gastos);
+      if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkAdd(gastosFijos);
     });
   } else {
     // Modo fusionar
-    await db.transaction('rw', [db.alumnos, db.grupos, db.pagos, db.gastos], async () => {
+    await db.transaction('rw', stores, async () => {
       if (alumnos.length) await db.alumnos.bulkPut(alumnos);
       if (grupos.length) await db.grupos.bulkPut(grupos);
       if (pagos.length) await db.pagos.bulkPut(pagos);
       if (gastos.length) await db.gastos.bulkPut(gastos);
+      if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkPut(gastosFijos);
     });
   }
 
   // Restaurar categorías en localStorage si vienen en la copia
   if (categorias?.gastos && Array.isArray(categorias.gastos)) {
     localStorage.setItem('ventus_cat_gastos', JSON.stringify(categorias.gastos));
+  }
+  if (categorias?.gastos_variables && Array.isArray(categorias.gastos_variables)) {
+    localStorage.setItem('ventus_cat_gastos_variables', JSON.stringify(categorias.gastos_variables));
+  }
+  if (categorias?.gastos_fijos && Array.isArray(categorias.gastos_fijos)) {
+    localStorage.setItem('ventus_cat_gastos_fijos', JSON.stringify(categorias.gastos_fijos));
   }
   if (categorias?.grupos && Array.isArray(categorias.grupos)) {
     localStorage.setItem('ventus_cat_grupos', JSON.stringify(categorias.grupos));
@@ -133,6 +151,7 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
     alumnos: alumnos.length,
     grupos: grupos.length,
     pagos: pagos.length,
-    gastos: gastos.length
+    gastos: gastos.length,
+    gastosFijos: gastosFijos.length
   };
 };

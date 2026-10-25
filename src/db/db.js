@@ -10,6 +10,11 @@ export class VentusDatabase extends Dexie {
       pagos: '++id, alumnoId, tipo, mes, año, importe, fecha',
       gastos: '++id, concepto, categoria, importe, fecha'
     });
+
+    this.version(2).stores({
+      gastos: '++id, concepto, categoria, importe, fecha, tipo, mes, año, gastoFijoId',
+      gastosFijos: '++id, concepto, categoria, importe, diaMes, activo'
+    });
   }
 }
 
@@ -86,11 +91,40 @@ export class Pago {
 }
 
 export class Gasto {
-  constructor({ concepto = '', categoria = '', importe = 0, fecha = new Date().toISOString() } = {}) {
+  constructor({
+    concepto = '',
+    categoria = '',
+    importe = 0,
+    fecha = new Date().toISOString(),
+    tipo = 'variable', // 'variable' o 'fijo'
+    mes = null,
+    año = null,
+    gastoFijoId = null
+  } = {}) {
     this.concepto = concepto;
     this.categoria = categoria;
     this.importe = importe;
     this.fecha = fecha;
+    this.tipo = tipo;
+    this.mes = mes;
+    this.año = año;
+    this.gastoFijoId = gastoFijoId;
+  }
+}
+
+export class GastoFijo {
+  constructor({
+    concepto = '',
+    categoria = '',
+    importe = 0,
+    diaMes = 1,
+    activo = true
+  } = {}) {
+    this.concepto = concepto;
+    this.categoria = categoria;
+    this.importe = importe;
+    this.diaMes = diaMes;
+    this.activo = activo;
   }
 }
 
@@ -101,4 +135,5 @@ db.alumnos.mapToClass(Alumno);
 db.grupos.mapToClass(Grupo);
 db.pagos.mapToClass(Pago);
 db.gastos.mapToClass(Gasto);
+db.gastosFijos.mapToClass(GastoFijo);
 

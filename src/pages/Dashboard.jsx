@@ -24,13 +24,14 @@ const Dashboard = () => {
   const pagos = useLiveQuery(() => pagoService.getAll(), []) || [];
   const gastos = useLiveQuery(() => gastoService.getAll(), []) || [];
   const grupos = useLiveQuery(() => grupoService.getAll(), []) || [];
+  const gastosFijos = useLiveQuery(() => gastoService.getAllFijos(), []) || [];
 
   const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [tabRecaudar, setTabRecaudar] = useState('cuotas'); // 'cuotas' | 'material' | 'examenes'
+  const [tabRecaudar, setTabRecaudar] = useState('cuotas'); // 'cuotas' | 'material' | 'examenes' | 'gastos_fijos'
 
   const meses = [
     { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' }, { value: 3, label: 'Marzo' },
@@ -41,7 +42,6 @@ const Dashboard = () => {
 
   // Generamos años desde 2 años antes hasta 2 años después
   const años = Array.from(new Array(5), (_, index) => today.getFullYear() - 2 + index);
-
 
   // KPIs clásicos
   const activeStudentsCount = useMemo(() => {
@@ -54,9 +54,17 @@ const Dashboard = () => {
       .reduce((sum, p) => sum + Number(p.importe), 0);
   }, [pagos, selectedMonth, selectedYear]);
 
+  // Estado de gastos fijos del mes (pagados vs pendientes)
+  const estadoFijosMes = useMemo(() => {
+    return gastoService.calcularEstadoFijosMes(gastosFijos, gastos, selectedMonth, selectedYear);
+  }, [gastosFijos, gastos, selectedMonth, selectedYear]);
+
   const currentMonthExpenses = useMemo(() => {
     return gastos
       .filter(g => {
+        if (g.mes && g.año) {
+          return Number(g.mes) === selectedMonth && Number(g.año) === selectedYear;
+        }
         const date = new Date(g.fecha);
         return (date.getMonth() + 1) === selectedMonth && date.getFullYear() === selectedYear;
       })
@@ -78,8 +86,11 @@ const Dashboard = () => {
       return pMes === selectedMonth && pAño === selectedYear;
     });
 
-    // 2. Gastos en el mes seleccionado
+    // 2. Gastos pagados en el mes seleccionado (fijos tildados y variables)
     const gastosMes = gastos.filter(g => {
+      if (g.mes && g.año) {
+        return Number(g.mes) === selectedMonth && Number(g.año) === selectedYear;
+      }
       const d = new Date(g.fecha);
       return (d.getMonth() + 1) === selectedMonth && d.getFullYear() === selectedYear;
     });
@@ -126,7 +137,7 @@ const Dashboard = () => {
     const filasGastos = gastosMes.map(g => [
       formatDate(g.fecha),
       g.concepto || '-',
-      g.categoria || 'Otros',
+      g.tipo === 'fijo' ? `${g.categoria || 'Fijo'} (Gasto Fijo)` : `${g.categoria || 'Variable'} (Variable)`,
       `-${formatCurrency(g.importe)}`
     ]);
 
@@ -368,7 +379,16 @@ const Dashboard = () => {
           <div className="kpi-title">
             <TrendingDown size={16} /> Gastos (Mes)
           </div>
-          <div className="kpi-value negative">{formatCurrency(currentMonthExpenses)}</div>
+          <div className="kpi-value negative">-{formatCurrency(currentMonthExpenses)}</div>
+          {estadoFijosMes.totalPendiente > 0 ? (
+            <div className="kpi-subtext" style={{ color: '#d97706', fontWeight: 600 }}>
+              ⚠️ {estadoFijosMes.countPendientes} fijos pendientes: -{formatCurrency(estadoFijosMes.totalPendiente)}
+            </div>
+          ) : (
+            <div className="kpi-subtext" style={{ color: 'var(--text-muted)' }}>
+              Fijos y variables abonados
+            </div>
+          )}
         </div>
 
         <div className="kpi-card">
@@ -400,15 +420,15 @@ const Dashboard = () => {
         <div className="dashboard-section-header">
           <div>
             <div className="dashboard-section-title">
-              <AlertCircle size={20} color="#f59e0b" /> Dinero por Recaudar
+              <AlertCircle size={20} color="#f59e0b" /> Dinero por Recaudar y Control de Pagos
             </div>
             <div className="dashboard-section-subtitle">
-              Pendientes de cobro en cuotas del mes ({mesSeleccionadoNombre}) y equipamientos
+              Pendientes de cobro en cuotas del mes ({mesSeleccionadoNombre}), equipamientos y control de gastos fijos
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f59e0b' }}>
-              Total Pendiente: {formatCurrency(dineroPorRecaudar.totalGeneral)}
+              Cobros Pendientes: {formatCurrency(dineroPorRecaudar.totalGeneral)}
             </span>
           </div>
         </div>
@@ -438,6 +458,18 @@ const Dashboard = () => {
               </div>
               <div className="pending-summary-amount">{formatCurrency(dineroPorRecaudar.totalExamenesPendientes)}</div>
               <small className="text-muted">{dineroPorRecaudar.examenesPendientes.length} inscripciones pendientes</small>
+            </div>
+          )}
+
+          {estadoFijosMes.totalPendiente > 0 && (
+            <div className="pending-summary-card" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+              <div className="pending-summary-label" style={{ color: '#ef4444' }}>
+                <TrendingDown size={15} /> Gastos Fijos por Pagar ({mesSeleccionadoNombre})
+              </div>
+              <div className="pending-summary-amount" style={{ color: '#ef4444' }}>
+                -{formatCurrency(estadoFijosMes.totalPendiente)}
+              </div>
+              <small className="text-muted">{estadoFijosMes.countPendientes} gastos fijos sin tildar</small>
             </div>
           )}
         </div>
@@ -470,6 +502,20 @@ const Dashboard = () => {
             >
               <Award size={16} /> Exámenes
               <span className="pending-badge">{dineroPorRecaudar.examenesPendientes.length}</span>
+            </button>
+          )}
+
+          {estadoFijosMes.countPendientes > 0 && (
+            <button 
+              type="button"
+              className={`pending-tab-btn ${tabRecaudar === 'gastos_fijos' ? 'active' : ''}`}
+              onClick={() => setTabRecaudar('gastos_fijos')}
+              style={{ color: tabRecaudar === 'gastos_fijos' ? '#ef4444' : undefined }}
+            >
+              <TrendingDown size={16} /> Gastos fijos por pagar
+              <span className="pending-badge" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+                {estadoFijosMes.countPendientes}
+              </span>
             </button>
           )}
         </div>
@@ -596,6 +642,41 @@ const Dashboard = () => {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+
+          {tabRecaudar === 'gastos_fijos' && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Gasto Fijo Pendiente</th>
+                  <th>Categoría</th>
+                  <th>Importe Previsto</th>
+                  <th style={{ textAlign: 'right' }}>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estadoFijosMes.pendientes.map(item => (
+                  <tr key={item.id}>
+                    <td><strong>{item.concepto}</strong></td>
+                    <td>
+                      <span className="badge" style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
+                        {item.categoria}
+                      </span>
+                    </td>
+                    <td><strong style={{ color: '#ef4444' }}>-{formatCurrency(item.importe)}</strong></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <Link 
+                        to="/gastos" 
+                        className="btn-secondary" 
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}
+                      >
+                        Tildar en Gastos <ArrowUpRight size={14} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

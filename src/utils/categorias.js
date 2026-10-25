@@ -3,7 +3,39 @@
 export const DEFAULT_CATEGORIAS_GRUPOS = [];
 export const DEFAULT_CATEGORIAS_MATERIAL = [];
 export const DEFAULT_CATEGORIAS_LICENCIAS = [];
+
+export const DEFAULT_CATEGORIAS_GASTOS_VARIABLES = [];
+export const DEFAULT_CATEGORIAS_GASTOS_FIJOS = [];
 export const DEFAULT_CATEGORIAS_GASTOS = [];
+
+// Lista de categorías predeterminadas que deben eliminarse de localStorage si se guardaron en sesiones anteriores
+const HARDCODED_DEFAULTS_TO_PURGE = [
+  'Material Deportivo', 'Equipamiento', 'Reparaciones', 'Eventos / Torneos', 
+  'Publicidad', 'Botiquín', 'Papelería', 'Otros', 'Alquiler', 'Luz / Electricidad', 
+  'Agua', 'Internet / Teléfono', 'Gestoría / Asesoría', 'Seguros', 
+  'Software / Licencias', 'Limpieza', 'Impuestos'
+];
+
+try {
+  if (typeof localStorage !== 'undefined') {
+    const purgeKeys = ['gastos', 'gastos_variables', 'gastos_fijos'];
+    purgeKeys.forEach(k => {
+      const raw = localStorage.getItem(`ventus_cat_${k}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(cat => 
+            !HARDCODED_DEFAULTS_TO_PURGE.some(def => def.toLowerCase() === (cat || '').trim().toLowerCase())
+          );
+          localStorage.setItem(`ventus_cat_${k}`, JSON.stringify(cleaned));
+        }
+      }
+    });
+  }
+} catch (e) {
+  // Ignorar errores si localStorage no está disponible
+}
+
 
 /**
  * Obtiene la lista de categorías almacenadas para una clave dada, combinándola con los valores por defecto
