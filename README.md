@@ -1,16 +1,54 @@
-# React + Vite
+# 🥋 Ventus Management App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Offline-first administrative management platform and financial dashboard developed for a martial arts club.
 
-Currently, two official plugins are available:
+[![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)](#)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](#)
+[![Dexie.js](https://img.shields.io/badge/IndexedDB-Dexie.js-2EAD33?style=flat-square)](#)
+[![PWA Ready](https://img.shields.io/badge/PWA-Enabled-5A0FC8?style=flat-square&logo=pwa&logoColor=white)](#)
+[![Deployment](https://img.shields.io/badge/Deploy-GitHub_Pages-222222?style=flat-square&logo=githubactions&logoColor=white)](#)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 📌 Overview
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Ventus Management App** is a dedicated operational tool built to digitize and automate the day-to-day administrative workflow of a martial arts club. 
 
-## Expanding the ESLint configuration
+It eliminates manual paper records and disconnected spreadsheets by providing a centralized, local-first system for student records, automated belt exam certifications, and expense tracking.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## ✨ Key Capabilities
+
+- **Financial & Accounting Management:** 
+  - Dynamic categorization between fixed and variable operational costs.
+  - Interactive balance graphs, revenue trends, and financial breakdown using **Recharts**.
+  - Direct data import/export support via spreadsheets (**SheetJS / XLSX**).
+
+- **Student Administration & Grading System:**
+  - Full registry of students, memberships, and active status tracking.
+  - Automated PDF document generation for rank grading/exams using **jsPDF** and **jsPDF-AutoTable**.
+
+- **Offline-First & Local Storage:**
+  - Persistent client-side data storage powered by **IndexedDB** through **Dexie.js**, guaranteeing complete functionality without an active internet connection.
+  - Automated backup and local restore routines.
+
+- **Progressive Web App (PWA):**
+  - Installable directly onto desktop or mobile devices via `vite-plugin-pwa`.
+
+---
+## ⚖️ License & Copyright
+
+**Copyright © 2026 Juan Francisco. All rights reserved.**
+
+This software is **proprietary and confidential**. It is developed exclusively for authorized use. No part of this codebase may be reproduced, distributed, decompiled, or commercialized by third parties without explicit written consent from the author.
+
+---
+
+## 👤 Author
+
+Developed by **Juan Francisco**  
+*Process Automation, Custom Tooling & Web Solutions*
+
+- **Email:** [escobosabrocaljuanfran@gmail.com](mailto:escobosabrocaljuanfran@gmail.com)
+- **GitHub:** [@Juanfran514](https://github.com/Juanfran514)
