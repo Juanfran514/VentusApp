@@ -4,13 +4,15 @@ import { gastoService } from '../services/gastoService';
 import Modal from '../components/ui/Modal';
 import SearchFilterBar from '../components/common/SearchFilterBar';
 import { 
-  Plus, Trash2, Edit2, RotateCcw, CheckCircle2, Clock, Calendar, Tag
+  Plus, Trash2, Edit2, RotateCcw, CheckCircle2, Clock, Calendar, Tag,
+  FileText, Paperclip, Download, Eye, Upload, Search, FileCheck
 } from 'lucide-react';
 import { 
   getStoredCategorias, 
   mergeCategorias 
 } from '../utils/categorias';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { procesarArchivoFactura, descargarFactura } from '../utils/facturaProcessor';
 import '../pages/Alumnos.css';
 import './Gastos.css';
 
@@ -49,7 +51,8 @@ const Gastos = () => {
     concepto: '',
     categoria: '',
     importe: '',
-    fecha: currentDate.toISOString().split('T')[0]
+    fecha: currentDate.toISOString().split('T')[0],
+    factura: null
   });
 
   // Formulario Nuevo Gasto Fijo Recurrente
@@ -64,6 +67,16 @@ const Gastos = () => {
   const [fijoMesEditando, setFijoMesEditando] = useState(null);
   const [importeFijoMes, setImporteFijoMes] = useState('');
   const [fechaFijoMes, setFechaFijoMes] = useState(currentDate.toISOString().split('T')[0]);
+  const [facturaFijoMes, setFacturaFijoMes] = useState(null);
+
+  // Estados para Archivo y Visualización de Facturas
+  const [isProcessingFactura, setIsProcessingFactura] = useState(false);
+  const [isModalVerFacturaOpen, setIsModalVerFacturaOpen] = useState(false);
+  const [gastoVisualizando, setGastoVisualizando] = useState(null);
+  const [facturaVisualizando, setFacturaVisualizando] = useState(null);
+  const [filtroAnoFacturas, setFiltroAnoFacturas] = useState(currentAño);
+  const [filtroPeriodoFacturas, setFiltroPeriodoFacturas] = useState('todos'); // 'todos' | '1t' | '2t' | '3t' | '4t'
+  const [busquedaFacturas, setBusquedaFacturas] = useState('');
 
   // Formulario Editar Plantilla Gasto Fijo base
   const [fijoPlantillaEditando, setFijoPlantillaEditando] = useState({
@@ -121,6 +134,64 @@ const Gastos = () => {
       });
   }, [gastos, busqueda, filtroCategoria]);
 
+  // Gastos con factura adjunta y filtrado para la pestaña de Archivo
+  const todosGastosConFactura = useMemo(() => {
+    return (gastos || []).filter(g => g.factura && g.factura.archivo);
+  }, [gastos]);
+
+  const facturasFiltradas = useMemo(() => {
+    return todosGastosConFactura.filter(g => {
+      const gAño = g.año || (g.fecha ? new Date(g.fecha).getFullYear() : null);
+      const gMes = g.mes || (g.fecha ? new Date(g.fecha).getMonth() + 1 : null);
+
+      if (gAño && Number(gAño) !== Number(filtroAnoFacturas)) return false;
+
+      if (filtroPeriodoFacturas === '1t' && (gMes < 1 || gMes > 3)) return false;
+      if (filtroPeriodoFacturas === '2t' && (gMes < 4 || gMes > 6)) return false;
+      if (filtroPeriodoFacturas === '3t' && (gMes < 7 || gMes > 9)) return false;
+      if (filtroPeriodoFacturas === '4t' && (gMes < 10 || gMes > 12)) return false;
+
+      if (busquedaFacturas) {
+        const term = busquedaFacturas.toLowerCase().trim();
+        const conceptoMatch = (g.concepto || '').toLowerCase().includes(term);
+        const catMatch = (g.categoria || '').toLowerCase().includes(term);
+        const fileMatch = (g.factura?.nombre || '').toLowerCase().includes(term);
+        if (!conceptoMatch && !catMatch && !fileMatch) return false;
+      }
+
+      return true;
+    }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }, [todosGastosConFactura, filtroAnoFacturas, filtroPeriodoFacturas, busquedaFacturas]);
+
+  const totalImporteFacturas = useMemo(() => {
+    return facturasFiltradas.reduce((sum, g) => sum + (Number(g.importe) || 0), 0);
+  }, [facturasFiltradas]);
+
+  // Manejador genérico de archivos de factura
+  const handleFacturaChange = async (e, setTarget) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsProcessingFactura(true);
+      const facturaObj = await procesarArchivoFactura(file);
+      setTarget(facturaObj);
+    } catch (err) {
+      console.error('Error procesando factura:', err);
+      alert(err.message || 'Error al procesar el archivo de la factura.');
+    } finally {
+      setIsProcessingFactura(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleVerFactura = (gasto) => {
+    if (!gasto?.factura) return;
+    setGastoVisualizando(gasto);
+    setFacturaVisualizando(gasto.factura);
+    setIsModalVerFacturaOpen(true);
+  };
+
   // =========================================================================
   // GESTIÓN DE GASTOS FIJOS
   // =========================================================================
@@ -149,6 +220,7 @@ const Gastos = () => {
     setFijoMesEditando(item);
     setImporteFijoMes(item.importe);
     setFechaFijoMes(item.fechaPago ? item.fechaPago.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setFacturaFijoMes(item.factura || null);
     setIsModalModificarFijoMesOpen(true);
   };
 
@@ -162,10 +234,12 @@ const Gastos = () => {
         mes: selectedMonth,
         año: selectedYear,
         nuevoImporte: Number(importeFijoMes) || 0,
-        fecha: fechaFijoMes
+        fecha: fechaFijoMes,
+        factura: facturaFijoMes
       });
       setIsModalModificarFijoMesOpen(false);
       setFijoMesEditando(null);
+      setFacturaFijoMes(null);
     } catch (err) {
       console.error('Error al modificar gasto fijo:', err);
       alert('Error al guardar la modificación.');
@@ -232,7 +306,8 @@ const Gastos = () => {
       concepto: '',
       categoria: '',
       importe: '',
-      fecha: new Date().toISOString().split('T')[0]
+      fecha: new Date().toISOString().split('T')[0],
+      factura: null
     });
     setIsModalVariableOpen(true);
   };
@@ -243,7 +318,8 @@ const Gastos = () => {
       concepto: gasto.concepto,
       categoria: gasto.categoria,
       importe: gasto.importe,
-      fecha: new Date().toISOString().split('T')[0]
+      fecha: new Date().toISOString().split('T')[0],
+      factura: null
     });
     setIsModalVariableOpen(true);
   };
@@ -263,7 +339,8 @@ const Gastos = () => {
       concepto: g.concepto,
       categoria: g.categoria,
       importe: g.importe,
-      fecha: g.fecha ? g.fecha.split('T')[0] : new Date().toISOString().split('T')[0]
+      fecha: g.fecha ? g.fecha.split('T')[0] : new Date().toISOString().split('T')[0],
+      factura: g.factura || null
     });
     setIsModalVariableOpen(true);
   };
@@ -277,7 +354,8 @@ const Gastos = () => {
           categoria: formDataVariable.categoria,
           importe: Number(formDataVariable.importe) || 0,
           fecha: formDataVariable.fecha,
-          tipo: 'variable'
+          tipo: 'variable',
+          factura: formDataVariable.factura
         });
       } else {
         await gastoService.create({
@@ -285,7 +363,8 @@ const Gastos = () => {
           categoria: formDataVariable.categoria,
           importe: Number(formDataVariable.importe) || 0,
           fecha: formDataVariable.fecha,
-          tipo: 'variable'
+          tipo: 'variable',
+          factura: formDataVariable.factura
         });
       }
       setIsModalVariableOpen(false);
@@ -319,17 +398,22 @@ const Gastos = () => {
               <Plus size={20} style={{ marginRight: '8px' }} />
               Nuevo Gasto Fijo
             </button>
-          ) : (
+          ) : activeTab === 'variables' ? (
             <button className="btn-primary flex-center" onClick={handleOpenNuevoVariable}>
               <Plus size={20} style={{ marginRight: '8px' }} />
               Añadir Gasto Variable
+            </button>
+          ) : (
+            <button className="btn-primary flex-center" onClick={handleOpenNuevoVariable}>
+              <Plus size={20} style={{ marginRight: '8px' }} />
+              Añadir Gasto con Factura
             </button>
           )}
         </div>
       </div>
 
       <div className="card">
-        {/* Pestañas de división entre Fijos y Variables */}
+        {/* Pestañas de división entre Fijos, Variables y Facturas */}
         <div className="gastos-tabs">
           <button 
             type="button"
@@ -346,6 +430,19 @@ const Gastos = () => {
           >
             <Tag size={18} />
             Gastos Variables e Historial
+          </button>
+          <button 
+            type="button"
+            className={`gastos-tab-btn ${activeTab === 'facturas' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('facturas'); setBusqueda(''); setFiltroCategoria(''); }}
+          >
+            <FileText size={18} />
+            <span>Archivo de Facturas</span>
+            {todosGastosConFactura.length > 0 && (
+              <span className="badge" style={{ background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', padding: '2px 7px', borderRadius: '10px' }}>
+                {todosGastosConFactura.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -473,7 +570,20 @@ const Gastos = () => {
                         </button>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{item.concepto}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600 }}>{item.concepto}</span>
+                          {item.factura && (
+                            <button
+                              type="button"
+                              className="btn-factura-badge"
+                              onClick={() => handleVerFactura(item)}
+                              title="Ver factura adjunta"
+                            >
+                              <Paperclip size={12} />
+                              <span>{item.factura.tipo === 'pdf' ? 'PDF' : 'Foto'}</span>
+                            </button>
+                          )}
+                        </div>
                         {item.gastoFijo?.diaMes && (
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                             Día {item.gastoFijo.diaMes} de cada mes
@@ -579,6 +689,7 @@ const Gastos = () => {
                     <th>Fecha</th>
                     <th>Concepto</th>
                     <th>Categoría</th>
+                    <th>Factura</th>
                     <th>Importe</th>
                     <th style={{ textAlign: 'right' }}>Acciones</th>
                   </tr>
@@ -592,6 +703,21 @@ const Gastos = () => {
                         <span className="badge badge-categoria">
                           {gasto.categoria}
                         </span>
+                      </td>
+                      <td>
+                        {gasto.factura ? (
+                          <button
+                            type="button"
+                            className="btn-factura-badge"
+                            onClick={() => handleVerFactura(gasto)}
+                            title="Ver factura adjunta"
+                          >
+                            <Paperclip size={12} />
+                            <span>{gasto.factura.tipo === 'pdf' ? 'PDF' : 'Foto'}</span>
+                          </button>
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: '0.8rem' }}>-</span>
+                        )}
                       </td>
                       <td style={{ color: 'var(--danger-color)', fontWeight: 'bold' }}>
                         -{formatCurrency(gasto.importe)}
@@ -626,8 +752,166 @@ const Gastos = () => {
                   ))}
                   {gastosVariablesFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="text-center" style={{ padding: '2rem' }}>
+                      <td colSpan="6" className="text-center" style={{ padding: '2rem' }}>
                         No hay gastos variables registrados que coincidan con la búsqueda.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            PESTAÑA 3: ARCHIVO DE FACTURAS Y TICKETS
+        ========================================================================= */}
+        {activeTab === 'facturas' && (
+          <div>
+            {/* Barra de control de período y filtros */}
+            <div className="periodo-selector-bar">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <Calendar size={18} style={{ color: 'var(--primary-color)' }} />
+                <span style={{ fontWeight: 600 }}>Año:</span>
+                <select 
+                  value={filtroAnoFacturas} 
+                  onChange={(e) => setFiltroAnoFacturas(Number(e.target.value))}
+                  style={{ width: 'auto', padding: '0.4rem 0.8rem' }}
+                >
+                  {añosList.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+
+                <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '0.5rem', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'todos', label: 'Todo el año' },
+                    { id: '1t', label: '1T (Ene-Mar)' },
+                    { id: '2t', label: '2T (Abr-Jun)' },
+                    { id: '3t', label: '3T (Jul-Sep)' },
+                    { id: '4t', label: '4T (Oct-Dic)' }
+                  ].map(tab => (
+                    <button
+                      type="button"
+                      key={tab.id}
+                      className={`btn-secondary ${filtroPeriodoFacturas === tab.id ? 'btn-primary' : ''}`}
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                      onClick={() => setFiltroPeriodoFacturas(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ position: 'relative', minWidth: '240px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar en facturas..."
+                  value={busquedaFacturas}
+                  onChange={(e) => setBusquedaFacturas(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px 6px 32px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-dark)',
+                    color: 'var(--text-light)'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* KPI Cards de Facturación */}
+            <div className="facturas-kpi-grid">
+              <div className="facturas-kpi-card">
+                <span className="facturas-kpi-title">Facturas y Tickets Justificados</span>
+                <span className="facturas-kpi-value" style={{ color: 'var(--primary-color)' }}>
+                  {facturasFiltradas.length}
+                </span>
+              </div>
+              <div className="facturas-kpi-card">
+                <span className="facturas-kpi-title">Importe Total Justificado</span>
+                <span className="facturas-kpi-value" style={{ color: 'var(--danger-color)' }}>
+                  -{formatCurrency(totalImporteFacturas)}
+                </span>
+              </div>
+            </div>
+
+            {/* Tabla de Facturas */}
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Categoría</th>
+                    <th>Tipo</th>
+                    <th>Importe</th>
+                    <th>Documento</th>
+                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facturasFiltradas.map(g => (
+                    <tr key={g.id}>
+                      <td>{formatDate(g.fecha)}</td>
+                      <td><strong>{g.concepto}</strong></td>
+                      <td>
+                        <span className="badge badge-categoria">{g.categoria}</span>
+                      </td>
+                      <td>
+                        <span className="badge" style={{ background: 'var(--bg-panel)', color: 'var(--text-light)', fontSize: '0.75rem' }}>
+                          {g.tipo === 'fijo' ? 'Fijo' : 'Variable'}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--danger-color)', fontWeight: 'bold' }}>
+                        -{formatCurrency(g.importe)}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {g.factura.tipo === 'pdf' ? (
+                            <FileText size={18} style={{ color: 'var(--primary-color)' }} />
+                          ) : (
+                            <img src={g.factura.archivo} alt="" style={{ width: '24px', height: '24px', borderRadius: '3px', objectFit: 'cover' }} />
+                          )}
+                          <span style={{ fontSize: '0.85rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.factura.nombre}>
+                            {g.factura.nombre || 'Factura'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', marginRight: '6px' }}
+                          onClick={() => handleVerFactura(g)}
+                        >
+                          <Eye size={14} style={{ marginRight: '4px' }} /> Ver
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title="Descargar factura"
+                          onClick={() => descargarFactura(g.factura, g.concepto)}
+                        >
+                          <Download size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {facturasFiltradas.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="text-center" style={{ padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                        <FileCheck size={42} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+                        <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+                          No hay facturas registradas en este período.
+                        </p>
+                        <p style={{ fontSize: '0.85rem' }}>
+                          Puedes adjuntar facturas en formato PDF o foto cada vez que añadas o edites un gasto.
+                        </p>
                       </td>
                     </tr>
                   )}
@@ -731,6 +1015,70 @@ const Gastos = () => {
               required 
               placeholder="0.00"
             />
+          </div>
+
+          {/* ADJUNTAR FACTURA / TICKET */}
+          <div className="form-group full-width">
+            <label>Factura / Ticket Justificante (Opcional)</label>
+            {formDataVariable.factura ? (
+              <div className="factura-adjunta-card">
+                <div className="factura-file-info">
+                  {formDataVariable.factura.tipo === 'pdf' ? (
+                    <FileText size={24} style={{ color: 'var(--primary-color)' }} />
+                  ) : (
+                    <img 
+                      src={formDataVariable.factura.archivo} 
+                      alt="" 
+                      style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }} 
+                    />
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      {formDataVariable.factura.nombre || 'Factura adjunta'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {formDataVariable.factura.tipo?.toUpperCase()}
+                      {formDataVariable.factura.tamano ? ` • ${(formDataVariable.factura.tamano / 1024).toFixed(1)} KB` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+                    onClick={() => handleVerFactura({ concepto: formDataVariable.concepto, importe: formDataVariable.importe, factura: formDataVariable.factura })}
+                  >
+                    <Eye size={14} style={{ marginRight: '4px' }} /> Ver
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon text-danger"
+                    onClick={() => setFormDataVariable(prev => ({ ...prev, factura: null }))}
+                    title="Eliminar factura"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="factura-upload-box">
+                <label className="btn-secondary flex-center" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
+                  <Upload size={16} style={{ marginRight: '6px' }} />
+                  {isProcessingFactura ? 'Procesando archivo...' : 'Adjuntar PDF o Foto de Factura'}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => handleFacturaChange(e, (fac) => setFormDataVariable(prev => ({ ...prev, factura: fac })))}
+                    style={{ display: 'none' }}
+                    disabled={isProcessingFactura}
+                  />
+                </label>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Formatos admitidos: PDF o Imágenes (JPG, PNG). Las fotos se optimizan automáticamente para no saturar memoria.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="form-actions full-width">
@@ -859,6 +1207,70 @@ const Gastos = () => {
               />
             </div>
 
+            {/* ADJUNTAR FACTURA DE ESTE MES */}
+            <div className="form-group full-width">
+              <label>Factura de este mes (Opcional)</label>
+              {facturaFijoMes ? (
+                <div className="factura-adjunta-card">
+                  <div className="factura-file-info">
+                    {facturaFijoMes.tipo === 'pdf' ? (
+                      <FileText size={24} style={{ color: 'var(--primary-color)' }} />
+                    ) : (
+                      <img 
+                        src={facturaFijoMes.archivo} 
+                        alt="" 
+                        style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }} 
+                      />
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                        {facturaFijoMes.nombre || 'Factura adjunta'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {facturaFijoMes.tipo?.toUpperCase()}
+                        {facturaFijoMes.tamano ? ` • ${(facturaFijoMes.tamano / 1024).toFixed(1)} KB` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+                      onClick={() => handleVerFactura({ concepto: fijoMesEditando.concepto, importe: importeFijoMes, factura: facturaFijoMes })}
+                    >
+                      <Eye size={14} style={{ marginRight: '4px' }} /> Ver
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-icon text-danger"
+                      onClick={() => setFacturaFijoMes(null)}
+                      title="Eliminar factura"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="factura-upload-box">
+                  <label className="btn-secondary flex-center" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
+                    <Upload size={16} style={{ marginRight: '6px' }} />
+                    {isProcessingFactura ? 'Procesando archivo...' : 'Adjuntar Factura de este mes (PDF o Foto)'}
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={(e) => handleFacturaChange(e, (fac) => setFacturaFijoMes(fac))}
+                      style={{ display: 'none' }}
+                      disabled={isProcessingFactura}
+                    />
+                  </label>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Ideal para recibos que varían cada mes (luz, agua, teléfono, suministros).
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="form-actions full-width">
               <button type="button" className="btn-secondary" onClick={() => setIsModalModificarFijoMesOpen(false)}>Cancelar</button>
               <button type="submit" className="btn-primary">Guardar y Marcar Pagado</button>
@@ -930,6 +1342,58 @@ const Gastos = () => {
             <button type="submit" className="btn-primary">Guardar Plantilla</button>
           </div>
         </form>
+      </Modal>
+
+      {/* =========================================================================
+          MODAL: VISUALIZADOR DE FACTURA / TICKET
+      ========================================================================= */}
+      <Modal
+        isOpen={isModalVerFacturaOpen}
+        onClose={() => { setIsModalVerFacturaOpen(false); setFacturaVisualizando(null); setGastoVisualizando(null); }}
+        title={gastoVisualizando ? `Factura: ${gastoVisualizando.concepto} (${formatCurrency(gastoVisualizando.importe || 0)})` : 'Factura Adjunta'}
+      >
+        {facturaVisualizando && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="factura-preview-modal-body">
+              {facturaVisualizando.tipo === 'pdf' ? (
+                <iframe
+                  src={facturaVisualizando.archivo}
+                  title="Factura PDF"
+                  className="factura-preview-iframe"
+                />
+              ) : (
+                <img
+                  src={facturaVisualizando.archivo}
+                  alt="Factura"
+                  className="factura-preview-img"
+                />
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {facturaVisualizando.nombre} {facturaVisualizando.tamano ? `(${(facturaVisualizando.tamano / 1024).toFixed(1)} KB)` : ''}
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn-primary flex-center"
+                  onClick={() => descargarFactura(facturaVisualizando, gastoVisualizando?.concepto)}
+                >
+                  <Download size={16} style={{ marginRight: '6px' }} />
+                  Descargar Factura
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => { setIsModalVerFacturaOpen(false); setFacturaVisualizando(null); setGastoVisualizando(null); }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

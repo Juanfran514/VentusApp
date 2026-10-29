@@ -15,6 +15,10 @@ export class VentusDatabase extends Dexie {
       gastos: '++id, concepto, categoria, importe, fecha, tipo, mes, año, gastoFijoId',
       gastosFijos: '++id, concepto, categoria, importe, diaMes, activo'
     });
+
+    this.version(3).stores({
+      productos: '++id, nombre, precio, activo'
+    });
   }
 }
 
@@ -39,6 +43,7 @@ export class Alumno {
     lesiones = '',
     cinturon = '',
     email = '',
+    foto = '',
     fechaAlta = new Date().toISOString()
   } = {}) {
     this.nombre = nombre;
@@ -54,6 +59,7 @@ export class Alumno {
     this.lesiones = lesiones;
     this.cinturon = cinturon;
     this.email = email;
+    this.foto = foto;
     this.fechaAlta = fechaAlta;
   }
 
@@ -99,7 +105,8 @@ export class Gasto {
     tipo = 'variable', // 'variable' o 'fijo'
     mes = null,
     año = null,
-    gastoFijoId = null
+    gastoFijoId = null,
+    factura = null
   } = {}) {
     this.concepto = concepto;
     this.categoria = categoria;
@@ -109,6 +116,7 @@ export class Gasto {
     this.mes = mes;
     this.año = año;
     this.gastoFijoId = gastoFijoId;
+    this.factura = factura;
   }
 }
 
@@ -128,6 +136,22 @@ export class GastoFijo {
   }
 }
 
+export class Producto {
+  constructor({
+    nombre = '',
+    precio = 0,
+    foto = '',
+    activo = true,
+    fechaCreacion = new Date().toISOString()
+  } = {}) {
+    this.nombre = nombre;
+    this.precio = precio;
+    this.foto = foto;
+    this.activo = activo;
+    this.fechaCreacion = fechaCreacion;
+  }
+}
+
 // ==========================================
 // TABLAS A CLASES
 // ==========================================
@@ -136,4 +160,5 @@ db.grupos.mapToClass(Grupo);
 db.pagos.mapToClass(Pago);
 db.gastos.mapToClass(Gasto);
 db.gastosFijos.mapToClass(GastoFijo);
+db.productos.mapToClass(Producto);
 

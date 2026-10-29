@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../ui/Modal';
-import { X } from 'lucide-react';
+import { X, Upload, Trash2, Camera, User } from 'lucide-react';
 import { CINTURONES_DISPONIBLES, normalizarCinturon } from '../../utils/cinturones';
 import { grupoService } from '../../services/grupoService';
 import { formatCurrency, getNombreCompleto, formatGrupoHorarios } from '../../utils/formatters';
+import { comprimirImagen } from '../../utils/imageCompressor';
 
 const ModalEditAlumno = ({
   isOpen,
@@ -25,8 +26,11 @@ const ModalEditAlumno = ({
     estado: 'activo',
     inscripciones: [],
     observaciones: '',
-    lesiones: ''
+    lesiones: '',
+    foto: ''
   });
+
+  const [isCompressing, setIsCompressing] = useState(false);
 
   useEffect(() => {
     if (alumno && isOpen) {
@@ -42,10 +46,32 @@ const ModalEditAlumno = ({
         estado: alumno.estado || 'activo',
         inscripciones: alumno.inscripciones || [],
         observaciones: alumno.observaciones || '',
-        lesiones: alumno.lesiones || ''
+        lesiones: alumno.lesiones || '',
+        foto: alumno.foto || ''
       });
     }
   }, [alumno, isOpen]);
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressing(true);
+      const dataUrl = await comprimirImagen(file, 320, 0.75);
+      setFormData(prev => ({ ...prev, foto: dataUrl }));
+    } catch (err) {
+      console.error('Error al procesar la foto del alumno:', err);
+      alert('Error al procesar la imagen seleccionada.');
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, foto: '' }));
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -117,6 +143,53 @@ const ModalEditAlumno = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Editar Alumno: ${getNombreCompleto(alumno)}`}>
       <form onSubmit={handleSubmit} className="form-grid">
+        {/* FOTO DEL ALUMNO */}
+        <div className="form-group full-width" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
+          <div style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: 'var(--bg-dark)',
+            border: '2px solid var(--border-color)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            {formData.foto ? (
+              <img src={formData.foto} alt="Foto Alumno" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <User size={36} style={{ color: 'var(--text-muted)' }} />
+            )}
+          </div>
+          <div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <label className="btn-secondary" style={{ cursor: 'pointer', fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}>
+                <Camera size={14} style={{ marginRight: '4px' }} />
+                {isCompressing ? 'Procesando...' : formData.foto ? 'Cambiar Foto' : 'Subir Foto'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  style={{ display: 'none' }}
+                  disabled={isCompressing}
+                />
+              </label>
+              {formData.foto && (
+                <button
+                  type="button"
+                  className="btn-icon text-danger"
+                  onClick={handleRemoveImage}
+                  title="Quitar foto"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="form-group">
           <label>Nombre *</label>
           <input

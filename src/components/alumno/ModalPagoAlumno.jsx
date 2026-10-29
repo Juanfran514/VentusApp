@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { productoService } from '../../services';
 import Modal from '../ui/Modal';
 
 const ModalPagoAlumno = ({
@@ -15,6 +17,7 @@ const ModalPagoAlumno = ({
   ]
 }) => {
   const currentDate = new Date();
+  const productos = useLiveQuery(() => productoService.getAll(), []) || [];
   const [formData, setFormData] = useState({
     tipo: 'cuota',
     concepto: '',
@@ -95,32 +98,60 @@ const ModalPagoAlumno = ({
             </div>
           </>
         ) : (
-          <div className="form-group full-width">
-            <label>Concepto / Detalle *</label>
-            <input
-              type="text"
-              value={formData.concepto}
-              onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
-              required
-              list={tipo === 'material' ? 'materiales-detalle-list' : tipo === 'licencia' ? 'licencias-detalle-list' : undefined}
-              placeholder={tipo === 'examen' ? 'Ej: Cinturón Amarillo' : tipo === 'material' ? 'Escribe o selecciona un material...' : 'Escribe o selecciona una licencia...'}
-              autoComplete="off"
-            />
-            {tipo === 'material' && (
-              <datalist id="materiales-detalle-list">
-                {materialesSugeridos.map((mat, idx) => (
-                  <option key={idx} value={mat} />
-                ))}
-              </datalist>
+          <>
+            {tipo === 'material' && productos.length > 0 && (
+              <div className="form-group full-width">
+                <label>Elegir del Catálogo de Productos</label>
+                <select
+                  onChange={(e) => {
+                    const prodId = Number(e.target.value);
+                    const prod = productos.find(p => p.id === prodId);
+                    if (prod) {
+                      setFormData(prev => ({
+                        ...prev,
+                        concepto: prod.nombre,
+                        importe: Number(prod.precio) || 0
+                      }));
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="">-- Seleccionar producto para autorrellenar --</option>
+                  {productos.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} ({p.precio.toFixed(2)} €)
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
-            {tipo === 'licencia' && (
-              <datalist id="licencias-detalle-list">
-                {licenciasSugeridas.map((lic, idx) => (
-                  <option key={idx} value={lic} />
-                ))}
-              </datalist>
-            )}
-          </div>
+            <div className="form-group full-width">
+              <label>Concepto / Detalle *</label>
+              <input
+                type="text"
+                value={formData.concepto}
+                onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
+                required
+                list={tipo === 'material' ? 'materiales-detalle-list' : tipo === 'licencia' ? 'licencias-detalle-list' : undefined}
+                placeholder={tipo === 'examen' ? 'Ej: Cinturón Amarillo' : tipo === 'material' ? 'Escribe o selecciona un material...' : 'Escribe o selecciona una licencia...'}
+                autoComplete="off"
+              />
+              {tipo === 'material' && (
+                <datalist id="materiales-detalle-list">
+                  {materialesSugeridos.map((mat, idx) => (
+                    <option key={idx} value={mat} />
+                  ))}
+                </datalist>
+              )}
+              {tipo === 'licencia' && (
+                <datalist id="licencias-detalle-list">
+                  {licenciasSugeridas.map((lic, idx) => (
+                    <option key={idx} value={lic} />
+                  ))}
+                </datalist>
+              )}
+            </div>
+          </>
         )}
 
         <div className="form-group">

@@ -65,7 +65,7 @@ const MainLayout = () => {
       setCandidateBackup(null);
       setMensaje({ 
         tipo: 'success', 
-        texto: `¡Restauración completada con éxito! (${stats.alumnos} alumnos, ${stats.grupos} grupos, ${stats.pagos} pagos).` 
+        texto: `¡Restauración completada con éxito! (${stats.alumnos} alumnos, ${stats.grupos} grupos, ${stats.pagos} cobros/cuotas, ${stats.gastos} gastos y ${stats.productos || 0} productos de equipamiento).` 
       });
     } catch (err) {
       console.error(err);
@@ -204,8 +204,9 @@ const MainLayout = () => {
               <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                 • Alumnos: {candidateBackup.data?.alumnos?.length || 0}<br />
                 • Grupos: {candidateBackup.data?.grupos?.length || 0}<br />
-                • Pagos y cuotas: {candidateBackup.data?.pagos?.length || 0}<br />
-                • Gastos: {candidateBackup.data?.gastos?.length || 0}
+                • Cobros y cuotas: {candidateBackup.data?.pagos?.length || 0}<br />
+                • Gastos: {candidateBackup.data?.gastos?.length || 0}<br />
+                • Catálogo de equipamiento: {candidateBackup.data?.productos?.length || 0}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService } from '../services/alumnoService';
 import { grupoService } from '../services/grupoService';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/common/StatusBadge';
-import { Plus, Edit2, Trash2, X, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Eye, Camera, Upload, User } from 'lucide-react';
 import { CINTURONES, normalizarCinturon } from '../utils/cinturones';
 import { formatCurrency, getNombreCompleto, formatGrupoHorarios } from '../utils/formatters';
+import { comprimirImagen } from '../utils/imageCompressor';
 import './Alumnos.css';
 
 const Alumnos = () => {
@@ -17,8 +18,9 @@ const Alumnos = () => {
 
   const [formData, setFormData] = useState({
     nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-    cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+    cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: '', foto: ''
   });
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const gruposDisponibles = useLiveQuery(() => grupoService.getAll()) || [];
 
@@ -98,7 +100,7 @@ const Alumnos = () => {
   const openNewModal = () => {
     setFormData({
       nombre: '', apellidos: '', fechaNac: '', telefono: '', nTutor: '', email: '',
-      cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: ''
+      cinturon: '', cuota: 0, estado: 'activo', inscripciones: [], observaciones: '', lesiones: '', foto: ''
     });
     setEditingId(null);
     setIsModalOpen(true);
@@ -117,10 +119,32 @@ const Alumnos = () => {
       estado: alumno.estado || 'activo',
       inscripciones: alumno.inscripciones || [],
       observaciones: alumno.observaciones || '',
-      lesiones: alumno.lesiones || ''
+      lesiones: alumno.lesiones || '',
+      foto: alumno.foto || ''
     });
     setEditingId(alumno.id);
     setIsModalOpen(true);
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressing(true);
+      const dataUrl = await comprimirImagen(file, 320, 0.75);
+      setFormData(prev => ({ ...prev, foto: dataUrl }));
+    } catch (err) {
+      console.error('Error al procesar la foto del alumno:', err);
+      alert('Error al procesar la imagen seleccionada.');
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, foto: '' }));
   };
 
   // Cálculo de cuota en tiempo real basado en grupos y días mediante grupoService
@@ -184,9 +208,9 @@ const Alumnos = () => {
       </div>
 
       <div className="card">
-        <input 
-          type="text" 
-          placeholder="Buscar alumno por nombre o apellidos..." 
+        <input
+          type="text"
+          placeholder="Buscar alumno por nombre o apellidos..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="search-input"
@@ -207,13 +231,41 @@ const Alumnos = () => {
               {alumnos?.map(alumno => (
                 <tr key={alumno.id}>
                   <td>
-                    <Link to={`/alumnos/${alumno.id}`} style={{ color: 'inherit', textDecoration: 'none' }} title="Ver ficha del alumno">
-                      <strong style={{ color: 'var(--primary-color)' }}>{getNombreCompleto(alumno)}</strong>
-                    </Link>
-                    <br/>
-                    <small className="text-muted">
-                      {alumno.telefono || 'Sin teléfono'} {alumno.cinturon ? `• ${normalizarCinturon(alumno.cinturon)}` : ''}
-                    </small>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {alumno.foto ? (
+                        <img
+                          src={alumno.foto}
+                          alt=""
+                          style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border-color)' }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          background: 'var(--bg-panel)',
+                          border: '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-muted)',
+                          flexShrink: 0
+                        }}>
+                          {alumno.nombre?.charAt(0)}{alumno.apellidos ? alumno.apellidos.charAt(0) : ''}
+                        </div>
+                      )}
+                      <div>
+                        <Link to={`/alumnos/${alumno.id}`} style={{ color: 'inherit', textDecoration: 'none' }} title="Ver ficha del alumno">
+                          <strong style={{ color: 'var(--primary-color)' }}>{getNombreCompleto(alumno)}</strong>
+                        </Link>
+                        <br />
+                        <small className="text-muted">
+                          {alumno.telefono || 'Sin teléfono'} {alumno.cinturon ? `• ${normalizarCinturon(alumno.cinturon)}` : ''}
+                        </small>
+                      </div>
+                    </div>
                   </td>
                   <td>{alumno.infoGrupos}</td>
                   <td><strong>{formatCurrency(alumno.cuota)}</strong></td>
@@ -249,6 +301,53 @@ const Alumnos = () => {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Editar Alumno" : "Nuevo Alumno"}>
         <form onSubmit={handleSubmit} className="form-grid">
+          {/* FOTO DEL ALUMNO */}
+          <div className="form-group full-width" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.5rem 0', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              background: 'var(--bg-dark)',
+              border: '2px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {formData.foto ? (
+                <img src={formData.foto} alt="Foto Alumno" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <User size={36} style={{ color: 'var(--text-muted)' }} />
+              )}
+            </div>
+            <div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label className="btn-secondary" style={{ cursor: 'pointer', fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}>
+                  <Camera size={14} style={{ marginRight: '4px' }} />
+                  {isCompressing ? 'Procesando...' : formData.foto ? 'Cambiar Foto' : 'Subir Foto'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={{ display: 'none' }}
+                    disabled={isCompressing}
+                  />
+                </label>
+                {formData.foto && (
+                  <button
+                    type="button"
+                    className="btn-icon text-danger"
+                    onClick={handleRemoveImage}
+                    title="Quitar foto"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Nombre *</label>
             <input name="nombre" value={formData.nombre} onChange={handleInputChange} required />
@@ -296,8 +395,8 @@ const Alumnos = () => {
             <div className="inscripciones-list">
               {formData.inscripciones.map((ins, index) => (
                 <div key={index} className="inscripcion-row">
-                  <select 
-                    value={ins.grupoId} 
+                  <select
+                    value={ins.grupoId}
                     onChange={(e) => handleInscripcionChange(index, 'grupoId', e.target.value)}
                     required
                   >
@@ -306,19 +405,19 @@ const Alumnos = () => {
                       <option key={g.id} value={g.id}>{g.nombre} ({formatGrupoHorarios(g)})</option>
                     ))}
                   </select>
-                  
+
                   <div className="dias-input">
                     <span>Días/sem:</span>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      max="7" 
-                      value={ins.dias} 
+                    <input
+                      type="number"
+                      min="1"
+                      max="7"
+                      value={ins.dias}
                       onChange={(e) => handleInscripcionChange(index, 'dias', e.target.value)}
                       required
                     />
                   </div>
-                  
+
                   <button type="button" className="btn-icon text-danger" onClick={() => handleRemoveInscripcion(index)}>
                     <X size={20} />
                   </button>
@@ -364,7 +463,7 @@ const Alumnos = () => {
               )}
             </small>
           </div>
-          
+
           <div className="form-group full-width">
             <label>Lesiones o Información médica</label>
             <textarea name="lesiones" value={formData.lesiones} onChange={handleInputChange} rows="2"></textarea>
@@ -373,7 +472,7 @@ const Alumnos = () => {
             <label>Otras observaciones</label>
             <textarea name="observaciones" value={formData.observaciones} onChange={handleInputChange} rows="2"></textarea>
           </div>
-          
+
           <div className="form-actions full-width">
             <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
             <button type="submit" className="btn-primary">{editingId ? "Actualizar Alumno" : "Guardar Alumno"}</button>

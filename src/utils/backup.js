@@ -25,6 +25,7 @@ export const exportarCopiaSeguridad = async () => {
   const pagos = await db.pagos.toArray();
   const gastos = await db.gastos.toArray();
   const gastosFijos = db.gastosFijos ? await db.gastosFijos.toArray() : [];
+  const productos = db.productos ? await db.productos.toArray() : [];
 
   const categoriasGastos = localStorage.getItem('ventus_cat_gastos');
   const categoriasGastosVariables = localStorage.getItem('ventus_cat_gastos_variables');
@@ -35,7 +36,7 @@ export const exportarCopiaSeguridad = async () => {
 
   const backupData = {
     app: 'VentusApp',
-    version: 2,
+    version: 3,
     fecha: new Date().toISOString(),
     data: {
       alumnos,
@@ -43,6 +44,7 @@ export const exportarCopiaSeguridad = async () => {
       pagos,
       gastos,
       gastosFijos,
+      productos,
       categorias: {
         gastos: categoriasGastos ? JSON.parse(categoriasGastos) : [],
         gastos_variables: categoriasGastosVariables ? JSON.parse(categoriasGastosVariables) : [],
@@ -97,10 +99,11 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
     throw new Error('El archivo no contiene datos válidos de VentusApp.');
   }
 
-  const { alumnos = [], grupos = [], pagos = [], gastos = [], gastosFijos = [], categorias = {} } = backupData.data;
+  const { alumnos = [], grupos = [], pagos = [], gastos = [], gastosFijos = [], productos = [], categorias = {} } = backupData.data;
 
   const stores = [db.alumnos, db.grupos, db.pagos, db.gastos];
   if (db.gastosFijos) stores.push(db.gastosFijos);
+  if (db.productos) stores.push(db.productos);
 
   if (modo === 'reemplazar') {
     await db.transaction('rw', stores, async () => {
@@ -109,12 +112,14 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
       await db.pagos.clear();
       await db.gastos.clear();
       if (db.gastosFijos) await db.gastosFijos.clear();
+      if (db.productos) await db.productos.clear();
 
       if (alumnos.length) await db.alumnos.bulkAdd(alumnos);
       if (grupos.length) await db.grupos.bulkAdd(grupos);
       if (pagos.length) await db.pagos.bulkAdd(pagos);
       if (gastos.length) await db.gastos.bulkAdd(gastos);
       if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkAdd(gastosFijos);
+      if (db.productos && productos.length) await db.productos.bulkAdd(productos);
     });
   } else {
     // Modo fusionar
@@ -124,6 +129,7 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
       if (pagos.length) await db.pagos.bulkPut(pagos);
       if (gastos.length) await db.gastos.bulkPut(gastos);
       if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkPut(gastosFijos);
+      if (db.productos && productos.length) await db.productos.bulkPut(productos);
     });
   }
 
@@ -152,6 +158,7 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
     grupos: grupos.length,
     pagos: pagos.length,
     gastos: gastos.length,
-    gastosFijos: gastosFijos.length
+    gastosFijos: gastosFijos.length,
+    productos: productos.length
   };
 };

@@ -13,8 +13,16 @@ const AlumnoHeader = ({ alumno, edad, onCambioCinturon, onToggleEstado }) => {
   return (
     <div className="profile-card">
       <div className="profile-avatar-wrapper">
-        <div className="profile-avatar">
-          {iniciales}
+        <div className="profile-avatar" style={{ overflow: 'hidden' }}>
+          {alumno.foto ? (
+            <img 
+              src={alumno.foto} 
+              alt={nombreCompleto} 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          ) : (
+            iniciales
+          )}
         </div>
         <span
           className={`badge badge-${alumno.estado}`}

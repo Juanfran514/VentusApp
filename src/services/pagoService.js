@@ -48,6 +48,43 @@ export const pagoService = {
   },
 
   /**
+   * Registra una venta múltiple de productos de equipamiento a un alumno.
+   * Crea una transacción atómica para añadir cada artículo a la tabla de pagos.
+   */
+  async registrarVentaMultiple({ alumnoId, items = [], fecha = new Date().toISOString(), estado = 'pendiente' }) {
+    if (!alumnoId) throw new Error('Se requiere el ID del alumno.');
+    if (!items || !items.length) throw new Error('Debe incluir al menos un producto en la venta.');
+
+    const fechaIso = fecha ? new Date(fecha).toISOString() : new Date().toISOString();
+    const pagosNuevos = items.map(item => {
+      const cantidad = Math.max(1, Number(item.cantidad) || 1);
+      const precioUnitario = Number(item.precio) || 0;
+      const totalLinea = Number((precioUnitario * cantidad).toFixed(2));
+      const concepto = cantidad > 1 
+        ? `${item.nombre} (x${cantidad})` 
+        : item.nombre;
+
+      return new Pago({
+        alumnoId: Number(alumnoId),
+        tipo: 'material',
+        concepto,
+        importe: totalLinea,
+        fecha: fechaIso,
+        estado
+      });
+    });
+
+    return db.transaction('rw', db.pagos, async () => {
+      const ids = [];
+      for (const p of pagosNuevos) {
+        const id = await db.pagos.add(p);
+        ids.push(id);
+      }
+      return ids;
+    });
+  },
+
+  /**
    * Marca un pago como 'pagado'
    */
   async marcarPagado(id) {

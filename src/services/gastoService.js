@@ -92,7 +92,8 @@ export const gastoService = {
           importe: Number(record.importe),
           fechaPago: record.fecha,
           pagado: true,
-          gastoRegistroId: record.id
+          gastoRegistroId: record.id,
+          factura: record.factura || null
         };
       }
 
@@ -104,7 +105,8 @@ export const gastoService = {
         importe: Number(gf.importe),
         fechaPago: null,
         pagado: false,
-        gastoRegistroId: null
+        gastoRegistroId: null,
+        factura: null
       };
     });
 
@@ -128,7 +130,7 @@ export const gastoService = {
   /**
    * Marca un gasto fijo como pagado (tildado) en el mes/año indicado.
    */
-  async tildarGastoFijo({ gastoFijo, mes, año, importe, fecha }) {
+  async tildarGastoFijo({ gastoFijo, mes, año, importe, fecha, factura = null }) {
     const mesNum = Number(mes);
     const añoNum = Number(año);
     const fechaObj = fecha ? new Date(fecha) : new Date();
@@ -143,7 +145,8 @@ export const gastoService = {
     if (existente) {
       await db.gastos.update(existente.id, {
         importe: importeFinal,
-        fecha: fechaObj.toISOString()
+        fecha: fechaObj.toISOString(),
+        ...(factura !== undefined && { factura })
       });
       return existente.id;
     }
@@ -156,7 +159,8 @@ export const gastoService = {
       tipo: 'fijo',
       mes: mesNum,
       año: añoNum,
-      gastoFijoId: gastoFijo.id
+      gastoFijoId: gastoFijo.id,
+      factura
     });
 
     return db.gastos.add(nuevoGasto);
@@ -179,9 +183,9 @@ export const gastoService = {
   },
 
   /**
-   * Modifica el importe o fecha de un gasto fijo para un mes específico
+   * Modifica el importe, fecha o factura de un gasto fijo para un mes específico
    */
-  async modificarGastoFijoMes({ gastoFijo, mes, año, nuevoImporte, fecha }) {
+  async modificarGastoFijoMes({ gastoFijo, mes, año, nuevoImporte, fecha, factura = undefined }) {
     const mesNum = Number(mes);
     const añoNum = Number(año);
 
@@ -192,11 +196,14 @@ export const gastoService = {
     const importeFinal = Number(nuevoImporte) || 0;
     const fechaISO = fecha ? new Date(fecha).toISOString() : new Date().toISOString();
 
+    const updates = {
+      importe: importeFinal,
+      fecha: fechaISO
+    };
+    if (factura !== undefined) updates.factura = factura;
+
     if (existente) {
-      await db.gastos.update(existente.id, {
-        importe: importeFinal,
-        fecha: fechaISO
-      });
+      await db.gastos.update(existente.id, updates);
       return existente.id;
     }
 
@@ -209,7 +216,8 @@ export const gastoService = {
       tipo: 'fijo',
       mes: mesNum,
       año: añoNum,
-      gastoFijoId: gastoFijo.id
+      gastoFijoId: gastoFijo.id,
+      factura: factura || null
     });
 
     return db.gastos.add(nuevoGasto);
@@ -231,7 +239,8 @@ export const gastoService = {
       tipo,
       mes: data.mes ? Number(data.mes) : d.getMonth() + 1,
       año: data.año ? Number(data.año) : d.getFullYear(),
-      gastoFijoId: data.gastoFijoId || null
+      gastoFijoId: data.gastoFijoId || null,
+      factura: data.factura || null
     });
 
     const id = await db.gastos.add(gastoInstance);
@@ -268,7 +277,22 @@ export const gastoService = {
       updates.mes = d.getMonth() + 1;
       updates.año = d.getFullYear();
     }
+    if (data.factura !== undefined) updates.factura = data.factura;
     return db.gastos.update(Number(id), updates);
+  },
+
+  /**
+   * Adjunta una factura a un gasto existente
+   */
+  async adjuntarFactura(gastoId, factura) {
+    return db.gastos.update(Number(gastoId), { factura });
+  },
+
+  /**
+   * Elimina la factura de un gasto
+   */
+  async eliminarFactura(gastoId) {
+    return db.gastos.update(Number(gastoId), { factura: null });
   },
 
   /**
