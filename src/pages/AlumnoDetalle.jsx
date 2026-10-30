@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService } from '../services/alumnoService';
@@ -19,17 +19,16 @@ import {
 } from 'lucide-react';
 import { DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS, getStoredCategorias, mergeCategorias } from '../utils/categorias';
 import { calculateAge, formatCurrency, formatDate } from '../utils/formatters';
+import { MESES_NOMBRES } from '../constants/fechas';
+import { useConfirm, useToast } from '../context/DialogContext';
 import './AlumnoDetalle.css';
 import './Alumnos.css';
-
-const MESES_NOMBRES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
 
 const AlumnoDetalle = () => {
   const { id } = useParams();
   const alumnoId = Number(id);
+  const confirm = useConfirm();
+  const { toast } = useToast();
 
   // Estados de navegación interna y modales
   const [activeTab, setActiveTab] = useState('historial');
@@ -46,7 +45,8 @@ const AlumnoDetalle = () => {
   // Consultas reactivas desacopladas mediante capa de servicios
   const alumno = useLiveQuery(() => alumnoService.getById(alumnoId), [alumnoId]);
   const todosPagos = useLiveQuery(() => pagoService.getAll(), []);
-  const grupos = useLiveQuery(() => grupoService.getAll(), []) || [];
+  const gruposRaw = useLiveQuery(() => grupoService.getAll(), []);
+  const grupos = useMemo(() => gruposRaw || [], [gruposRaw]);
 
   // Materiales sugeridos para autocompletado
   const materialesSugeridos = useMemo(() => {
@@ -178,10 +178,11 @@ const AlumnoDetalle = () => {
   const handleSaveEdit = async (updatedData) => {
     try {
       await alumnoService.update(alumno.id, updatedData);
+      toast.success('Datos del alumno actualizados');
       setIsEditModalOpen(false);
     } catch (error) {
       console.error('Error guardando cambios del alumno', error);
-      alert('Hubo un error al guardar los cambios.');
+      toast.error('Hubo un error al guardar los cambios.');
     }
   };
 
@@ -192,10 +193,11 @@ const AlumnoDetalle = () => {
       await alumnoService.update(alumno.id, {
         cuota: Number(cuotaRapidaInput) || 0
       });
+      toast.success('Cuota mensual actualizada');
       setIsCuotaModalOpen(false);
     } catch (err) {
       console.error('Error guardando cuota:', err);
-      alert('Hubo un error al guardar la cuota.');
+      toast.error('Hubo un error al guardar la cuota.');
     }
   };
 
@@ -212,27 +214,43 @@ const AlumnoDetalle = () => {
         ...pagoFormData,
         alumnoId: alumno.id
       });
+      toast.success('Registro guardado correctamente');
       setIsPagoModalOpen(false);
     } catch (error) {
       console.error('Error registrando pago:', error);
-      alert('Hubo un error al registrar el pago.');
+      toast.error('Hubo un error al registrar el pago.');
     }
   };
 
   // Acciones sobre pagos
   const handleMarcarPagado = async (pagoId) => {
     await pagoService.marcarPagado(pagoId);
+    toast.success('Marcado como pagado');
   };
 
   const handleRevertirPago = async (pagoId) => {
-    if (window.confirm('¿Deshacer el pago y volver a marcarlo como pendiente?')) {
+    const ok = await confirm({
+      title: 'Revertir pago',
+      message: '¿Deshacer el pago y volver a marcarlo como pendiente?',
+      confirmText: 'Revertir',
+      variant: 'warning'
+    });
+    if (ok) {
       await pagoService.revertirPago(pagoId);
+      toast.info('El pago ha vuelto a estado pendiente');
     }
   };
 
   const handleDeletePago = async (pagoId) => {
-    if (window.confirm('¿Eliminar este registro de pago definitivamente?')) {
+    const ok = await confirm({
+      title: 'Eliminar pago',
+      message: '¿Eliminar este registro de pago definitivamente?',
+      confirmText: 'Eliminar',
+      variant: 'danger'
+    });
+    if (ok) {
       await pagoService.delete(pagoId);
+      toast.success('Registro eliminado');
     }
   };
 

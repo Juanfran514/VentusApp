@@ -32,7 +32,7 @@ try {
       }
     });
   }
-} catch (e) {
+} catch {
   // Ignorar errores si localStorage no está disponible
 }
 

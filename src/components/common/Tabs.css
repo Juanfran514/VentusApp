@@ -1,0 +1,58 @@
+.ventus-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ventus-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.6rem 1.15rem;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.ventus-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ventus-tab-btn.active {
+  background: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ventus-tab-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ventus-tab-badge.danger {
+  background: var(--danger-color);
+  color: #fff;
+}
+
+.ventus-tab-badge.primary {
+  background: rgba(255, 255, 255, 0.22);
+  color: inherit;
+}
+
+.ventus-tab-btn:not(.active) .ventus-tab-badge.primary {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+

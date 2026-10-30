@@ -8,38 +8,54 @@ export const TIPOS_PAGO = {
   CUOTA: {
     id: 'cuota',
     label: 'Cuota',
-    modalTitle: 'Cobro de Cuota',
+    pluralLabel: 'Cuotas',
+    modalTitle: 'Registrar Cobro de Cuota',
     estadoInicial: 'pagado',
     requiresPeriod: true, // Requiere mes y año
+    usesCatalog: false,
+    suggestionKey: null,
     placeholderConcepto: 'Ej: Cuota Septiembre 2026',
-    defaultConcepto: (mesNombre, año) => `Cuota ${mesNombre || ''} ${año || ''}`.trim()
+    defaultConcepto: (mesNombre, año) => `Cuota ${mesNombre || ''} ${año || ''}`.trim(),
+    defaultImporte: (alumno) => Number(alumno?.cuota) || 0
   },
   EXAMEN: {
     id: 'examen',
     label: 'Examen',
-    modalTitle: 'Examen de Grado',
+    pluralLabel: 'Exámenes',
+    modalTitle: 'Registrar Examen',
     estadoInicial: 'pendiente',
     requiresPeriod: false,
+    usesCatalog: false,
+    suggestionKey: null,
     placeholderConcepto: 'Ej: Cinturón Amarillo',
-    defaultConcepto: () => 'Examen de Grado'
+    defaultConcepto: () => 'Examen de Grado',
+    defaultImporte: () => 0
   },
   MATERIAL: {
     id: 'material',
     label: 'Material',
-    modalTitle: 'Venta de Material',
+    pluralLabel: 'Materiales',
+    modalTitle: 'Registrar Material',
     estadoInicial: 'pendiente',
     requiresPeriod: false,
-    placeholderConcepto: 'Ej: Guantes 12oz, Espinilleras...',
-    defaultConcepto: () => ''
+    usesCatalog: true,
+    suggestionKey: 'materialesSugeridos',
+    placeholderConcepto: 'Escribe o selecciona un material...',
+    defaultConcepto: () => '',
+    defaultImporte: () => 0
   },
   LICENCIA: {
     id: 'licencia',
     label: 'Licencia',
-    modalTitle: 'Licencia Deportiva',
+    pluralLabel: 'Licencias',
+    modalTitle: 'Registrar Licencia Deportiva',
     estadoInicial: 'pendiente',
     requiresPeriod: false,
-    placeholderConcepto: 'Ej: Licencia Autonómica 2026, Seguro Federativo...',
-    defaultConcepto: () => 'Licencia Deportiva'
+    usesCatalog: false,
+    suggestionKey: 'licenciasSugeridas',
+    placeholderConcepto: 'Escribe o selecciona una licencia...',
+    defaultConcepto: () => 'Licencia Autonómica',
+    defaultImporte: () => 0
   }
 };
 
@@ -47,10 +63,14 @@ export const getTipoPagoConfig = (tipo) => {
   return TIPOS_PAGO[tipo?.toUpperCase()] || {
     id: tipo || 'otro',
     label: tipo || 'Pago',
-    modalTitle: `Cobro de ${tipo || 'Pago'}`,
+    pluralLabel: 'Pagos',
+    modalTitle: `Registrar ${tipo || 'Pago'}`,
     estadoInicial: 'pagado',
     requiresPeriod: false,
+    usesCatalog: false,
+    suggestionKey: null,
     placeholderConcepto: 'Concepto del pago',
-    defaultConcepto: () => ''
+    defaultConcepto: () => '',
+    defaultImporte: () => 0
   };
 };

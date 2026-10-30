@@ -84,14 +84,26 @@ export class Grupo {
 }
 
 export class Pago {
-  constructor({ alumnoId, tipo = 'cuota', mes = new Date().getMonth() + 1, año = new Date().getFullYear(), importe = 0, fecha = new Date().toISOString(), concepto = '', estado = 'pagado' } = {}) {
+  constructor({
+    alumnoId,
+    tipo = 'cuota',
+    mes = null,
+    año = null,
+    importe = 0,
+    fecha = new Date().toISOString(),
+    concepto = '',
+    estado = 'pagado'
+  } = {}) {
+    const d = fecha ? new Date(fecha) : new Date();
+    const validDate = !isNaN(d.getTime()) ? d : new Date();
+
     this.alumnoId = alumnoId;
-    this.tipo = tipo; // 'cuota', 'material', 'examen' 
-    this.mes = mes;
-    this.año = año;
-    this.importe = importe;
+    this.tipo = tipo; // 'cuota', 'material', 'examen', 'licencia'
+    this.mes = mes !== null && mes !== undefined && mes !== '' ? Number(mes) : validDate.getMonth() + 1;
+    this.año = año !== null && año !== undefined && año !== '' ? Number(año) : validDate.getFullYear();
+    this.importe = Number(importe) || 0;
     this.fecha = fecha;
-    this.concepto = concepto; // ej: "Cinturón Blanco", "Examen Cinturón Negro"
+    this.concepto = concepto;
     this.estado = estado; // 'pagado' o 'pendiente'
   }
 }
@@ -108,13 +120,16 @@ export class Gasto {
     gastoFijoId = null,
     factura = null
   } = {}) {
+    const d = fecha ? new Date(fecha) : new Date();
+    const validDate = !isNaN(d.getTime()) ? d : new Date();
+
     this.concepto = concepto;
     this.categoria = categoria;
-    this.importe = importe;
+    this.importe = Number(importe) || 0;
     this.fecha = fecha;
     this.tipo = tipo;
-    this.mes = mes;
-    this.año = año;
+    this.mes = mes !== null && mes !== undefined && mes !== '' ? Number(mes) : validDate.getMonth() + 1;
+    this.año = año !== null && año !== undefined && año !== '' ? Number(año) : validDate.getFullYear();
     this.gastoFijoId = gastoFijoId;
     this.factura = factura;
   }

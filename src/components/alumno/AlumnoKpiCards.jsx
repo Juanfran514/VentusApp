@@ -1,4 +1,3 @@
-import React from 'react';
 import { DollarSign, Clock, AlertTriangle, ShieldCheck, Edit2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 

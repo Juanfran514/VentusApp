@@ -1,7 +1,13 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { formatCurrency } from './formatters';
 import logoImg from '../assets/logo.png';
+
+const loadPdfLibs = async () => {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable')
+  ]);
+  return { jsPDF, autoTable };
+};
 
 let cachedLogoElement = null;
 
@@ -14,7 +20,7 @@ try {
     }
   };
   preloadImg.src = logoImg;
-} catch (e) {
+} catch {
   // Ignorar errores de precarga inicial
 }
 
@@ -102,6 +108,7 @@ export const exportarMesAPdf = async ({
   totalRegistros = 0,
   nombreArchivo = 'informe.pdf'
 }) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -247,6 +254,7 @@ export const exportarBalanceFinancieroPDF = async ({
   filasGastos = [],
   nombreArchivo = 'balance_financiero.pdf'
 }) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',

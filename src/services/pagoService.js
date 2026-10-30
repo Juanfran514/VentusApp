@@ -1,6 +1,7 @@
 import { db, Pago } from '../db/db';
 import { getNombreCompleto } from '../utils/formatters';
 import { saveStoredCategoria, DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS } from '../utils/categorias';
+import { MESES_NOMBRES } from '../constants/fechas';
 
 export const pagoService = {
   /**
@@ -178,11 +179,6 @@ export const pagoService = {
    */
   agruparPagosPorMes(pagos = []) {
     if (!pagos || !pagos.length) return [];
-
-    const MESES_NOMBRES = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
 
     const gruposMap = {};
 

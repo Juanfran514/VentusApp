@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertTriangle, FileText } from 'lucide-react';
 
 const AlumnoSaludTab = ({ lesiones = '', observaciones = '' }) => {

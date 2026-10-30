@@ -1,5 +1,4 @@
-import React from 'react';
-import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, Clock } from 'lucide-react';
 
 /**
  * Componente unificado para badges de estado (activo, baja, pagado, pendiente)

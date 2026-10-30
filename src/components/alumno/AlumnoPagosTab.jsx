@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus, Medal, Package, IdCard, RotateCcw, Trash2 } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import { formatCurrency, formatDate } from '../../utils/formatters';

@@ -1,26 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { alumnoService, pagoService } from '../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import { exportarMesAPdf } from '../utils/pdfExport';
+import { MESES, getNombreMes, generarRangoAños } from '../constants/fechas';
 import Modal from '../components/ui/Modal';
+import Tabs from '../components/common/Tabs';
 import StatusBadge from '../components/common/StatusBadge';
 import MonthlyAccordionList from '../components/common/MonthlyAccordionList';
 import { Plus, Trash2, RotateCcw, Calendar } from 'lucide-react';
+import { useConfirm, useToast } from '../context/DialogContext';
 import '../pages/Alumnos.css';
-
-const MESES = [
-  { id: 1, name: 'Enero' }, { id: 2, name: 'Febrero' }, { id: 3, name: 'Marzo' },
-  { id: 4, name: 'Abril' }, { id: 5, name: 'Mayo' }, { id: 6, name: 'Junio' },
-  { id: 7, name: 'Julio' }, { id: 8, name: 'Agosto' }, { id: 9, name: 'Septiembre' },
-  { id: 10, name: 'Octubre' }, { id: 11, name: 'Noviembre' }, { id: 12, name: 'Diciembre' }
-];
 
 const Cobros = () => {
   const currentDate = new Date();
   const currentMes = currentDate.getMonth() + 1;
   const currentAño = currentDate.getFullYear();
-  const currentMesNombre = MESES.find(m => m.id === currentMes)?.name || '';
+  const currentMesNombre = getNombreMes(currentMes);
 
   const [activeTab, setActiveTab] = useState('pendientes');
   const [search, setSearch] = useState('');
@@ -35,13 +31,14 @@ const Cobros = () => {
     fecha: currentDate.toISOString().split('T')[0]
   });
 
-  // Consultas reactivas desacopladas mediante la capa de servicios (DIP)
+  const confirm = useConfirm();
+  const { toast } = useToast();
+
   const alumnos = useLiveQuery(() => alumnoService.getActivos(), []);
   const pagos = useLiveQuery(() => pagoService.getAll(), []);
 
   const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 
-  // Estado de cuotas del mes actual (SRP)
   const { pendientes, pagados: pagadosDelMes } = useMemo(() => {
     return pagoService.calcularEstadoCuotasMes(alumnos, pagos, currentMes, currentAño, search);
   }, [alumnos, pagos, currentMes, currentAño, search]);
@@ -59,7 +56,6 @@ const Cobros = () => {
     return filtrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   }, [pagos, alumnosMap, search]);
 
-  // Agrupación mensual para el historial de cuotas
   const gruposMensualesCuotas = useMemo(() => {
     return pagoService.agruparPagosPorMes(historial);
   }, [historial]);
@@ -84,7 +80,6 @@ const Cobros = () => {
     setIsModalOpen(true);
   };
 
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
@@ -107,31 +102,47 @@ const Cobros = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.alumnoId) {
-      alert('Debes seleccionar un alumno');
+      toast.warning('Debes seleccionar un alumno');
       return;
     }
 
     try {
       await pagoService.create({
         ...formData,
-        concepto: `Cuota ${MESES.find(m => m.id === Number(formData.mes))?.name} ${formData.año}`,
+        concepto: `Cuota ${getNombreMes(formData.mes)} ${formData.año}`,
         estado: 'pagado'
       });
+      toast.success('Cuota registrada correctamente');
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error guardando pago:', error);
+      toast.error('Hubo un error al guardar el cobro.');
     }
   };
 
   const handleDeletePago = async (id) => {
-    if (window.confirm('¿Eliminar este registro por completo?')) {
+    const ok = await confirm({
+      title: 'Eliminar registro',
+      message: '¿Eliminar este registro por completo?',
+      confirmText: 'Eliminar',
+      variant: 'danger'
+    });
+    if (ok) {
       await pagoService.delete(id);
+      toast.success('Registro eliminado');
     }
   };
 
   const handleRevertirPago = async (id) => {
-    if (window.confirm('¿Deshacer el pago de esta cuota? El alumno volverá a aparecer como Pendiente.')) {
+    const ok = await confirm({
+      title: 'Deshacer pago de cuota',
+      message: '¿Deshacer el pago de esta cuota? El alumno volverá a aparecer como Pendiente.',
+      confirmText: 'Deshacer pago',
+      variant: 'warning'
+    });
+    if (ok) {
       await pagoService.delete(id);
+      toast.info('Cuota revertida a estado pendiente');
     }
   };
 
@@ -140,7 +151,7 @@ const Cobros = () => {
     const rows = grupo.items.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
-      p.concepto || `Cuota ${MESES.find(m => m.id === p.mes)?.name || ''} ${p.año || ''}`,
+      p.concepto || `Cuota ${getNombreMes(p.mes)} ${p.año || ''}`,
       formatCurrency(p.importe)
     ]);
     await exportarMesAPdf({
@@ -159,7 +170,7 @@ const Cobros = () => {
     const rows = historial.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
-      p.concepto || `Cuota ${MESES.find(m => m.id === p.mes)?.name || ''} ${p.año || ''}`,
+      p.concepto || `Cuota ${getNombreMes(p.mes)} ${p.año || ''}`,
       formatCurrency(p.importe)
     ]);
     const total = historial.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
@@ -174,8 +185,20 @@ const Cobros = () => {
     });
   };
 
-  const currentYear = new Date().getFullYear();
-  const años = [currentYear - 1, currentYear, currentYear + 1];
+  const años = generarRangoAños(currentAño, 1, 1);
+
+  const tabsConfig = [
+    {
+      id: 'pendientes',
+      label: 'Estado de Cuotas',
+      badge: pendientes.length,
+      badgeVariant: 'danger'
+    },
+    {
+      id: 'historial',
+      label: 'Historial'
+    }
+  ];
 
   return (
     <div className="page-container">
@@ -188,46 +211,13 @@ const Cobros = () => {
       </div>
 
       <div className="card">
-        <div className="tabs" style={{ display: 'flex', gap: '20px', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-          <button 
-            className={`tab-btn ${activeTab === 'pendientes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pendientes')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              fontSize: '1.1em', 
-              cursor: 'pointer', 
-              color: activeTab === 'pendientes' ? 'var(--primary-color)' : 'var(--text-color)', 
-              fontWeight: activeTab === 'pendientes' ? 'bold' : 'normal', 
-              borderBottom: activeTab === 'pendientes' ? '2px solid var(--primary-color)' : 'none', 
-              padding: '5px 10px' 
-            }}
-          >
-            Estado de Cuotas
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
-            onClick={() => setActiveTab('historial')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              fontSize: '1.1em', 
-              cursor: 'pointer', 
-              color: activeTab === 'historial' ? 'var(--primary-color)' : 'var(--text-color)', 
-              fontWeight: activeTab === 'historial' ? 'bold' : 'normal', 
-              borderBottom: activeTab === 'historial' ? '2px solid var(--primary-color)' : 'none', 
-              padding: '5px 10px' 
-            }}
-          >
-            Historial
-          </button>
-        </div>
+        <Tabs tabs={tabsConfig} activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="filters" style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}>
-            <input 
-              type="text" 
-              placeholder="Buscar alumno..." 
+            <input
+              type="text"
+              placeholder="Buscar alumno..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="search-input"
@@ -312,7 +302,7 @@ const Cobros = () => {
                         <td>{formatDate(pago.fecha)}</td>
                         <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                         <td style={{ textTransform: 'capitalize' }}>{pago.tipo}</td>
-                        <td>{pago.tipo === 'cuota' ? `${MESES.find(m => m.id === pago.mes)?.name || ''} ${pago.año || ''}` : '-'}</td>
+                        <td>{pago.tipo === 'cuota' ? `${getNombreMes(pago.mes)} ${pago.año || ''}` : '-'}</td>
                         <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>+{formatCurrency(pago.importe)}</td>
                         <td>
                           <button className="btn-icon text-primary" title="Revertir a Pendiente" onClick={() => handleRevertirPago(pago.id)} style={{ marginRight: '8px' }}>
@@ -341,11 +331,11 @@ const Cobros = () => {
               {alumnos?.map(al => <option key={al.id} value={al.id}>{getNombreCompleto(al)}</option>)}
             </select>
           </div>
-          
+
           <div className="form-group">
             <label>Mes *</label>
             <select name="mes" value={formData.mes} onChange={handleInputChange} required>
-              {MESES.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {MESES.map(m => <option key={m.num} value={m.num}>{m.nombre}</option>)}
             </select>
           </div>
           <div className="form-group">

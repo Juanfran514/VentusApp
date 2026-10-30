@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, FileDown, Layers, CheckCircle2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ChevronRight, FileDown, Layers } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 import './MonthlyAccordionList.css';
 
@@ -8,26 +8,20 @@ const MonthlyAccordionList = ({
   renderTable,
   onExportPdf,
   onExportTodoPdf,
-  tituloTipo = 'Registros',
   tipoRegistroLabel = 'registros',
   emptyMessage = 'No hay registros para mostrar en el historial.'
 }) => {
-  // Claves de los meses abiertos (por defecto el mes más reciente está abierto)
-  const [openMonths, setOpenMonths] = useState(() => {
+  // null = estado inicial (abre automáticamente el mes más reciente disponible)
+  const [openMonthsState, setOpenMonthsState] = useState(null);
+
+  const effectiveOpenMonths = useMemo(() => {
+    if (openMonthsState !== null) return openMonthsState;
     if (gruposMensuales.length > 0) {
       return new Set([gruposMensuales[0].key]);
     }
     return new Set();
-  });
+  }, [openMonthsState, gruposMensuales]);
 
-  // Al cambiar la lista (por filtros/búsqueda), si el conjunto está vacío y hay elementos, abrir el primero
-  useEffect(() => {
-    if (gruposMensuales.length > 0 && openMonths.size === 0) {
-      setOpenMonths(new Set([gruposMensuales[0].key]));
-    }
-  }, [gruposMensuales]);
-
-  // Totales globales de todos los meses visibles
   const { totalGlobalImporte, totalGlobalRegistros } = useMemo(() => {
     let imp = 0;
     let reg = 0;
@@ -39,8 +33,13 @@ const MonthlyAccordionList = ({
   }, [gruposMensuales]);
 
   const toggleMonth = (key) => {
-    setOpenMonths(prev => {
-      const next = new Set(prev);
+    setOpenMonthsState(prev => {
+      const current = prev !== null
+        ? prev
+        : gruposMensuales.length > 0
+        ? new Set([gruposMensuales[0].key])
+        : new Set();
+      const next = new Set(current);
       if (next.has(key)) {
         next.delete(key);
       } else {
@@ -51,11 +50,11 @@ const MonthlyAccordionList = ({
   };
 
   const expandAll = () => {
-    setOpenMonths(new Set(gruposMensuales.map(g => g.key)));
+    setOpenMonthsState(new Set(gruposMensuales.map(g => g.key)));
   };
 
   const collapseAll = () => {
-    setOpenMonths(new Set());
+    setOpenMonthsState(new Set());
   };
 
   if (gruposMensuales.length === 0) {
@@ -71,33 +70,34 @@ const MonthlyAccordionList = ({
       {/* Barra de control y resumen superior */}
       <div className="monthly-accordion-summary-bar">
         <div className="monthly-accordion-summary-text">
-          Historial de <strong>{gruposMensuales.length}</strong> {gruposMensuales.length === 1 ? 'mes' : 'meses'} •{' '}
+          Historial de <strong>{gruposMensuales.length}</strong>{' '}
+          {gruposMensuales.length === 1 ? 'mes' : 'meses'} •{' '}
           <strong>{totalGlobalRegistros}</strong> {tipoRegistroLabel} • Total acumulado:{' '}
           <span className="highlight-amount">+{formatCurrency(totalGlobalImporte)}</span>
         </div>
 
         <div className="monthly-accordion-global-actions">
-          <button 
-            type="button" 
-            className="btn-accordion-control" 
-            onClick={expandAll} 
+          <button
+            type="button"
+            className="btn-accordion-control"
+            onClick={expandAll}
             title="Abrir todos los meses"
           >
             <Layers size={14} /> Expandir todos
           </button>
-          <button 
-            type="button" 
-            className="btn-accordion-control" 
-            onClick={collapseAll} 
+          <button
+            type="button"
+            className="btn-accordion-control"
+            onClick={collapseAll}
             title="Cerrar todos los meses"
           >
             Colapsar
           </button>
           {onExportTodoPdf && (
-            <button 
-              type="button" 
-              className="btn-accordion-export-all" 
-              onClick={onExportTodoPdf} 
+            <button
+              type="button"
+              className="btn-accordion-export-all"
+              onClick={onExportTodoPdf}
               title="Exportar todo el historial actual a un único PDF"
             >
               <FileDown size={15} /> Exportar Todo a PDF
@@ -108,12 +108,12 @@ const MonthlyAccordionList = ({
 
       {/* Lista de acordeones por mes */}
       {gruposMensuales.map(grupo => {
-        const isOpen = openMonths.has(grupo.key);
+        const isOpen = effectiveOpenMonths.has(grupo.key);
 
         return (
           <div key={grupo.key} className={`monthly-accordion-item ${isOpen ? 'is-open' : ''}`}>
-            <div 
-              className="monthly-accordion-header" 
+            <div
+              className="monthly-accordion-header"
               onClick={() => toggleMonth(grupo.key)}
               role="button"
               tabIndex={0}
@@ -131,11 +131,12 @@ const MonthlyAccordionList = ({
                 <h3 className="monthly-accordion-title">{grupo.mesNombre}</h3>
                 <div className="monthly-accordion-badges">
                   <span className="badge-items-count">
-                    {grupo.totalItems} {grupo.totalItems === 1 ? tipoRegistroLabel.replace(/es$|s$/, '') : tipoRegistroLabel}
+                    {grupo.totalItems}{' '}
+                    {grupo.totalItems === 1
+                      ? tipoRegistroLabel.replace(/es$|s$/, '')
+                      : tipoRegistroLabel}
                   </span>
-                  <span className="badge-month-total">
-                    +{formatCurrency(grupo.totalImporte)}
-                  </span>
+                  <span className="badge-month-total">+{formatCurrency(grupo.totalImporte)}</span>
                 </div>
               </div>
 

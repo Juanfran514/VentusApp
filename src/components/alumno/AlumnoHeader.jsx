@@ -1,4 +1,3 @@
-import React from 'react';
 import { Phone, Calendar, Award, User, Mail } from 'lucide-react';
 import { CINTURONES_DISPONIBLES, normalizarCinturon, getBeltClass } from '../../utils/cinturones';
 import { formatDate, getNombreCompleto } from '../../utils/formatters';
