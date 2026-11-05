@@ -99,7 +99,12 @@ const AlumnoPagosTab = ({
                   </strong>
                 </td>
                 <td style={{ fontWeight: 'bold', color: pago.estado === 'pagado' ? 'var(--primary-color)' : 'var(--danger-color)' }}>
-                  {pago.estado === 'pagado' ? `+${formatCurrency(pago.importe)}` : formatCurrency(pago.importe)}
+                  <div>{pago.estado === 'pagado' ? `+${formatCurrency(pago.importe)}` : formatCurrency(pago.importe)}</div>
+                  {pago.beneficio > 0 && pago.tipo !== 'cuota' && (
+                    <div style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 'normal' }}>
+                      +{formatCurrency(pago.beneficio)} ganancia
+                    </div>
+                  )}
                 </td>
                 <td>
                   <StatusBadge status={pago.estado} />

@@ -100,6 +100,7 @@ const Dashboard = () => {
       mes: selectedMonth,
       año: selectedYear,
       totalIngresos: currentMonthIncome,
+      gananciaOperativa: currentMonthGain,
       totalGastos: currentMonthExpenses,
       beneficioNeto: netProfit
     });

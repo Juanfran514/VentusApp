@@ -43,8 +43,8 @@ export const analyticsService = {
 
   /**
    * Calcula la ganancia operativa bruta del mes:
-   * Para cuotas, exámenes y licencias: suma el 100% del importe.
-   * Para equipamiento/material: suma únicamente el beneficio limpio del gimnasio.
+   * Para cuotas: suma el 100% del importe.
+   * Para equipamiento, exámenes y licencias: suma únicamente el beneficio limpio del gimnasio.
    */
   calcularGananciaOperativaMes(pagos = [], mes, año) {
     const mesNum = Number(mes);
@@ -52,7 +52,7 @@ export const analyticsService = {
     return pagos
       .filter(p => Number(p.mes) === mesNum && Number(p.año) === añoNum && p.estado === 'pagado')
       .reduce((sum, p) => {
-        if (p.tipo === 'material') {
+        if (p.tipo === 'material' || p.tipo === 'examen' || p.tipo === 'licencia') {
           return sum + (Number(p.beneficio !== undefined ? p.beneficio : 0) || 0);
         }
         return sum + (Number(p.importe) || 0);
@@ -187,7 +187,7 @@ export const analyticsService = {
       const gainForMonth = pagos
         .filter(p => Number(p.mes) === m && Number(p.año) === añoNum && p.estado === 'pagado')
         .reduce((sum, p) => {
-          if (p.tipo === 'material') {
+          if (p.tipo === 'material' || p.tipo === 'examen' || p.tipo === 'licencia') {
             return sum + (Number(p.beneficio !== undefined ? p.beneficio : 0) || 0);
           }
           return sum + (Number(p.importe) || 0);

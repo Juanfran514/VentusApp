@@ -44,7 +44,9 @@ const GestionCargosTemplate = ({
   const [formData, setFormData] = useState({
     alumnoId: '',
     concepto: '',
-    importe: 0,
+    importe: '',
+    coste: '',
+    beneficio: '',
     fecha: new Date().toISOString().split('T')[0]
   });
 
@@ -74,11 +76,48 @@ const GestionCargosTemplate = ({
     return pagoService.agruparPagosPorMes(pagados);
   }, [pagados]);
 
+  const pvp = Number(formData.importe) || 0;
+  const beneficio = Number(formData.beneficio) || 0;
+  const margenPct = pvp > 0 && beneficio > 0 ? Math.round((beneficio / pvp) * 100) : null;
+
+  const handlePvpChange = (val) => {
+    const numPvp = Number(val);
+    const updates = { importe: val };
+    if (!isNaN(numPvp) && val !== '') {
+      if (formData.coste !== '' && !isNaN(Number(formData.coste))) {
+        updates.beneficio = Math.max(0, numPvp - Number(formData.coste)).toFixed(2);
+      } else if (formData.beneficio !== '' && !isNaN(Number(formData.beneficio))) {
+        updates.coste = Math.max(0, numPvp - Number(formData.beneficio)).toFixed(2);
+      }
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleCosteChange = (val) => {
+    const numCoste = Number(val);
+    const updates = { coste: val };
+    if (!isNaN(numCoste) && val !== '' && !isNaN(pvp)) {
+      updates.beneficio = Math.max(0, pvp - numCoste).toFixed(2);
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleBeneficioChange = (val) => {
+    const numBen = Number(val);
+    const updates = { beneficio: val };
+    if (!isNaN(numBen) && val !== '' && !isNaN(pvp)) {
+      updates.coste = Math.max(0, pvp - numBen).toFixed(2);
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
   const openModal = () => {
     setFormData({
       alumnoId: '',
       concepto: '',
-      importe: 0,
+      importe: '',
+      coste: '',
+      beneficio: '',
       fecha: new Date().toISOString().split('T')[0]
     });
     setIsModalOpen(true);
@@ -88,7 +127,7 @@ const GestionCargosTemplate = ({
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'importe' || name === 'alumnoId' ? (value ? Number(value) : '') : value
+      [name]: name === 'alumnoId' ? (value ? Number(value) : '') : value
     }));
   };
 
@@ -102,9 +141,13 @@ const GestionCargosTemplate = ({
     try {
       const conceptoTrimmed = (formData.concepto || '').trim();
       await pagoService.create({
-        ...formData,
+        alumnoId: formData.alumnoId,
         concepto: conceptoTrimmed,
         tipo,
+        fecha: formData.fecha,
+        importe: Number(formData.importe) || 0,
+        coste: formData.coste !== '' ? Number(formData.coste) : 0,
+        beneficio: formData.beneficio !== '' ? Number(formData.beneficio) : 0,
         estado: 'pendiente'
       });
 
@@ -152,39 +195,45 @@ const GestionCargosTemplate = ({
   };
 
   const handleExportPdfMes = async (grupo) => {
-    const headers = ['Fecha', 'Alumno', conceptoColumnLabel, 'Importe'];
+    const headers = ['Fecha', 'Alumno', conceptoColumnLabel, 'PVP', 'Margen'];
     const rows = grupo.items.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
       p.concepto,
-      formatCurrency(p.importe)
+      formatCurrency(p.importe),
+      p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
+    const totalMargen = grupo.items.reduce((sum, p) => sum + (Number(p.beneficio) || 0), 0);
     await exportarMesAPdf({
       titulo: pdfTituloMes,
       mesNombre: grupo.mesNombre,
       headers,
       rows,
       totalImporte: grupo.totalImporte,
+      totalMargen,
       totalRegistros: grupo.totalItems,
       nombreArchivo: `${pdfFilePrefix}_${grupo.key}.pdf`
     });
   };
 
   const handleExportTodoPdf = async () => {
-    const headers = ['Fecha', 'Alumno', conceptoColumnLabel, 'Importe'];
+    const headers = ['Fecha', 'Alumno', conceptoColumnLabel, 'PVP', 'Margen'];
     const rows = pagados.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
       p.concepto,
-      formatCurrency(p.importe)
+      formatCurrency(p.importe),
+      p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
     const total = pagados.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
+    const totalMargen = pagados.reduce((sum, p) => sum + (Number(p.beneficio) || 0), 0);
     await exportarMesAPdf({
       titulo: pdfTituloCompleto,
       mesNombre: 'Todos los períodos',
       headers,
       rows,
       totalImporte: total,
+      totalMargen,
       totalRegistros: pagados.length,
       nombreArchivo: `historial_${pdfFilePrefix}_completo.pdf`
     });
@@ -234,7 +283,7 @@ const GestionCargosTemplate = ({
                   <th>{fechaColumnLabel}</th>
                   <th>Alumno</th>
                   <th>{conceptoColumnLabel}</th>
-                  <th>Importe</th>
+                  <th>P.V.P.</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -245,7 +294,14 @@ const GestionCargosTemplate = ({
                     <td>{formatDate(pago.fecha)}</td>
                     <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                     <td>{pago.concepto}</td>
-                    <td>{formatCurrency(pago.importe)}</td>
+                    <td>
+                      <div>{formatCurrency(pago.importe)}</div>
+                      {pago.beneficio > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#22c55e' }}>
+                          +{formatCurrency(pago.beneficio)} ganancia
+                        </div>
+                      )}
+                    </td>
                     <td><StatusBadge status={pago.estado} /></td>
                     <td>
                       <button
@@ -291,7 +347,7 @@ const GestionCargosTemplate = ({
                       <th>{fechaColumnLabel}</th>
                       <th>Alumno</th>
                       <th>{conceptoColumnLabel}</th>
-                      <th>Importe</th>
+                      <th>P.V.P.</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
@@ -303,7 +359,12 @@ const GestionCargosTemplate = ({
                         <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
                         <td>{pago.concepto}</td>
                         <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>
-                          +{formatCurrency(pago.importe)}
+                          <div>+{formatCurrency(pago.importe)}</div>
+                          {pago.beneficio > 0 && (
+                            <div style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 'normal' }}>
+                              +{formatCurrency(pago.beneficio)} ganancia
+                            </div>
+                          )}
                         </td>
                         <td><StatusBadge status={pago.estado} /></td>
                         <td>
@@ -364,13 +425,107 @@ const GestionCargosTemplate = ({
               </datalist>
             )}
           </div>
-          <div className="form-group">
+          <div className="form-group full-width">
             <label>{fechaInputLabel}</label>
             <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required />
           </div>
-          <div className="form-group">
-            <label>Importe (€) *</label>
-            <input type="number" step="0.01" min="0" name="importe" value={formData.importe} onChange={handleInputChange} required />
+
+          {/* Sección de Precio, Coste y Beneficio */}
+          <div className="form-group full-width" style={{ marginTop: '0.25rem' }}>
+            <div
+              style={{
+                padding: '12px',
+                borderRadius: '8px',
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border-color)'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '10px'
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  PRECIO Y MARGEN COMERCIAL
+                </span>
+                {margenPct !== null && (
+                  <span
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: 'rgba(34, 197, 94, 0.15)',
+                      color: '#22c55e',
+                      border: '1px solid rgba(34, 197, 94, 0.3)'
+                    }}
+                  >
+                    Margen: {margenPct}% (+{formatCurrency(formData.beneficio)})
+                  </span>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: '12px'
+                }}
+              >
+                <div>
+                  <label style={{ fontSize: '0.8rem' }}>P.V.P. (€) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="importe"
+                    value={formData.importe}
+                    onChange={(e) => handlePvpChange(e.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    Lo que paga el alumno
+                  </small>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem' }}>Precio Coste (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="coste"
+                    value={formData.coste}
+                    onChange={(e) => handleCosteChange(e.target.value)}
+                    placeholder="0.00"
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    Coste federativo / trámite
+                  </small>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#22c55e' }}>Beneficio Limpio (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="beneficio"
+                    value={formData.beneficio}
+                    onChange={(e) => handleBeneficioChange(e.target.value)}
+                    placeholder="0.00"
+                    style={{ borderColor: 'rgba(34, 197, 94, 0.5)' }}
+                  />
+                  <small style={{ color: '#22c55e', fontSize: '0.7rem' }}>
+                    Ganancia para el gimnasio
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="form-actions full-width">
@@ -384,4 +539,3 @@ const GestionCargosTemplate = ({
 };
 
 export default GestionCargosTemplate;
-

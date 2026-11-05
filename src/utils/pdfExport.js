@@ -105,6 +105,7 @@ export const exportarMesAPdf = async ({
   headers = [],
   rows = [],
   totalImporte = 0,
+  totalMargen = undefined,
   totalRegistros = 0,
   nombreArchivo = 'informe.pdf'
 }) => {
@@ -157,24 +158,53 @@ export const exportarMesAPdf = async ({
   doc.setFillColor(249, 250, 251);
   doc.roundedRect(14, 45, 182, 14, 2, 2, 'FD');
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...darkBg);
-  doc.text('Total Registros:', 20, 54);
+  doc.text('Total Registros:', 18, 54);
   doc.setFont('helvetica', 'normal');
-  doc.text(String(totalRegistros), 48, 54);
+  doc.text(String(totalRegistros), 45, 54);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Total Recaudado:', 110, 54);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(22, 163, 74); // verde oscuro para contraste en papel blanco
-  doc.text(formatCurrency(totalImporte), 142, 54);
+  if (totalMargen !== undefined) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Recaudado (PVP):', 65, 54);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkBg);
+    doc.text(formatCurrency(totalImporte), 108, 54);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ganancia Gimnasio:', 135, 54);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 163, 74);
+    doc.text(`+${formatCurrency(totalMargen)}`, 168, 54);
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Recaudado:', 110, 54);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 163, 74); // verde oscuro para contraste en papel blanco
+    doc.text(formatCurrency(totalImporte), 142, 54);
+  }
 
   // 4. Tabla de datos
-  const footRow = headers.map((_, idx) => {
+  const footRow = headers.map((h, idx) => {
     if (idx === 0) return 'TOTAL';
+    const hl = h.toLowerCase();
+    if (hl.includes('margen') || hl.includes('ganancia') || hl.includes('beneficio')) {
+      return totalMargen !== undefined ? `+${formatCurrency(totalMargen)}` : '';
+    }
+    if (hl.includes('pvp') || hl.includes('importe') || hl.includes('precio')) {
+      return formatCurrency(totalImporte);
+    }
     if (idx === headers.length - 1) return formatCurrency(totalImporte);
     return '';
+  });
+
+  const columnStyles = {};
+  headers.forEach((h, idx) => {
+    const hl = h.toLowerCase();
+    if (hl.includes('pvp') || hl.includes('importe') || hl.includes('margen') || hl.includes('ganancia') || hl.includes('precio')) {
+      columnStyles[idx] = { halign: 'right', fontStyle: 'bold' };
+    }
   });
 
   autoTable(doc, {
@@ -200,6 +230,7 @@ export const exportarMesAPdf = async ({
       fillColor: [248, 250, 252]
     },
     columnStyles: {
+      ...columnStyles,
       [headers.length - 1]: { halign: 'right', fontStyle: 'bold' }
     },
     footStyles: {
@@ -246,6 +277,7 @@ export const exportarMesAPdf = async ({
 export const exportarBalanceFinancieroPDF = async ({
   mesNombre = '',
   totalIngresos = 0,
+  gananciaOperativa = undefined,
   totalGastos = 0,
   beneficioNeto = 0,
   desgloseIngresos = [],
@@ -296,41 +328,88 @@ export const exportarBalanceFinancieroPDF = async ({
   });
   doc.text(`Fecha de emisión: ${fechaEmision}`, 14, 39);
 
-  // 3. Tarjeta de resumen ejecutivo (3 columnas: Ingresos, Gastos, Beneficio Neto)
+  // 3. Tarjeta de resumen ejecutivo
   doc.setDrawColor(229, 231, 235);
   doc.setFillColor(249, 250, 251);
-  doc.roundedRect(14, 43, 182, 18, 2, 2, 'FD');
 
-  // Columna 1: Ingresos
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...mutedGray);
-  doc.text('INGRESOS TOTALES', 20, 49);
-  doc.setFontSize(11);
-  doc.setTextColor(22, 163, 74);
-  doc.text(`+${formatCurrency(totalIngresos)}`, 20, 56);
+  const hayMargenDiferente = gananciaOperativa !== undefined && gananciaOperativa !== totalIngresos;
 
-  // Columna 2: Gastos
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...mutedGray);
-  doc.text('GASTOS TOTALES', 82, 49);
-  doc.setFontSize(11);
-  doc.setTextColor(...dangerRed);
-  doc.text(`-${formatCurrency(totalGastos)}`, 82, 56);
+  if (hayMargenDiferente) {
+    // 4 columnas
+    doc.roundedRect(14, 43, 182, 18, 2, 2, 'FD');
 
-  // Columna 3: Beneficio Neto
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...mutedGray);
-  doc.text('BENEFICIO NETO', 144, 49);
-  doc.setFontSize(11);
-  if (beneficioNeto >= 0) {
+    // Columna 1: Facturación en caja
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('FACTURACIÓN (CAJA)', 18, 49);
+    doc.setFontSize(10);
+    doc.setTextColor(...darkBg);
+    doc.text(formatCurrency(totalIngresos), 18, 56);
+
+    // Columna 2: Ganancia Operativa
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('GANANCIA BRUTA', 65, 49);
+    doc.setFontSize(10);
     doc.setTextColor(22, 163, 74);
-    doc.text(`+${formatCurrency(beneficioNeto)}`, 144, 56);
-  } else {
+    doc.text(`+${formatCurrency(gananciaOperativa)}`, 65, 56);
+
+    // Columna 3: Gastos
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('GASTOS TOTALES', 112, 49);
+    doc.setFontSize(10);
     doc.setTextColor(...dangerRed);
-    doc.text(formatCurrency(beneficioNeto), 144, 56);
+    doc.text(`-${formatCurrency(totalGastos)}`, 112, 56);
+
+    // Columna 4: Beneficio Neto
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('BENEFICIO NETO', 155, 49);
+    doc.setFontSize(10);
+    if (beneficioNeto >= 0) {
+      doc.setTextColor(22, 163, 74);
+      doc.text(`+${formatCurrency(beneficioNeto)}`, 155, 56);
+    } else {
+      doc.setTextColor(...dangerRed);
+      doc.text(formatCurrency(beneficioNeto), 155, 56);
+    }
+  } else {
+    // 3 columnas estándar
+    doc.roundedRect(14, 43, 182, 18, 2, 2, 'FD');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('INGRESOS TOTALES', 20, 49);
+    doc.setFontSize(11);
+    doc.setTextColor(22, 163, 74);
+    doc.text(`+${formatCurrency(totalIngresos)}`, 20, 56);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('GASTOS TOTALES', 82, 49);
+    doc.setFontSize(11);
+    doc.setTextColor(...dangerRed);
+    doc.text(`-${formatCurrency(totalGastos)}`, 82, 56);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedGray);
+    doc.text('BENEFICIO NETO', 144, 49);
+    doc.setFontSize(11);
+    if (beneficioNeto >= 0) {
+      doc.setTextColor(22, 163, 74);
+      doc.text(`+${formatCurrency(beneficioNeto)}`, 144, 56);
+    } else {
+      doc.setTextColor(...dangerRed);
+      doc.text(formatCurrency(beneficioNeto), 144, 56);
+    }
   }
 
   let currentY = 67;
@@ -341,21 +420,45 @@ export const exportarBalanceFinancieroPDF = async ({
   doc.setTextColor(...darkBg);
   doc.text('1. Fuentes de Ingresos', 14, currentY);
 
-  const rowsFuentes = desgloseIngresos.map(d => [
-    d.fuente,
-    String(d.cantidad),
-    formatCurrency(d.total)
-  ]);
+  const hayDesgloseGanancia = desgloseIngresos.some(d => d.ganancia !== undefined && d.ganancia !== d.total);
+
+  const headFuentes = hayDesgloseGanancia
+    ? [['Fuente de Ingreso', 'Operaciones', 'Total Cobrado (PVP)', 'Ganancia Gimnasio']]
+    : [['Fuente de Ingreso', 'Operaciones', 'Total Recaudado']];
+
+  const rowsFuentes = desgloseIngresos.map(d => {
+    if (hayDesgloseGanancia) {
+      return [
+        d.fuente,
+        String(d.cantidad),
+        formatCurrency(d.total),
+        `+${formatCurrency(d.ganancia !== undefined ? d.ganancia : d.total)}`
+      ];
+    }
+    return [
+      d.fuente,
+      String(d.cantidad),
+      formatCurrency(d.total)
+    ];
+  });
+
+  const footFuentes = hayDesgloseGanancia
+    ? [['TOTAL', '', formatCurrency(totalIngresos), `+${formatCurrency(gananciaOperativa || totalIngresos)}`]]
+    : [['TOTAL INGRESOS', '', `+${formatCurrency(totalIngresos)}`]];
 
   autoTable(doc, {
     startY: currentY + 3,
-    head: [['Fuente de Ingreso', 'Operaciones', 'Total Recaudado']],
+    head: headFuentes,
     body: rowsFuentes,
-    foot: [['TOTAL INGRESOS', '', `+${formatCurrency(totalIngresos)}`]],
+    foot: footFuentes,
     theme: 'striped',
     headStyles: { fillColor: primaryGreen, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     styles: { fontSize: 8.5, cellPadding: 3, textColor: [31, 41, 55] },
-    columnStyles: {
+    columnStyles: hayDesgloseGanancia ? {
+      1: { halign: 'center' },
+      2: { halign: 'right' },
+      3: { halign: 'right', fontStyle: 'bold' }
+    } : {
       1: { halign: 'center' },
       2: { halign: 'right', fontStyle: 'bold' }
     },

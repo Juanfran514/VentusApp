@@ -392,7 +392,14 @@ const AlumnoDetalle = () => {
                   <tr key={p.id}>
                     <td>{formatDate(p.fecha)}</td>
                     <td><strong>{p.concepto}</strong></td>
-                    <td>{formatCurrency(p.importe)}</td>
+                    <td>
+                      <div>{formatCurrency(p.importe)}</div>
+                      {p.beneficio > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#22c55e' }}>
+                          +{formatCurrency(p.beneficio)} ganancia
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <StatusBadge status={p.estado} />
                     </td>

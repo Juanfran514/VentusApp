@@ -295,12 +295,14 @@ const Equipamiento = () => {
       formatCurrency(p.importe),
       p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
+    const totalMargen = grupo.items.reduce((sum, p) => sum + (Number(p.beneficio) || 0), 0);
     await exportarMesAPdf({
       titulo: 'Informe de Equipamiento',
       mesNombre: grupo.mesNombre,
       headers,
       rows,
       totalImporte: grupo.totalImporte,
+      totalMargen,
       totalRegistros: grupo.totalItems,
       nombreArchivo: `equipamiento_${grupo.key}.pdf`
     });
@@ -316,12 +318,14 @@ const Equipamiento = () => {
       p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
     const total = pagados.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
+    const totalMargen = pagados.reduce((sum, p) => sum + (Number(p.beneficio) || 0), 0);
     await exportarMesAPdf({
       titulo: 'Historial Completo de Equipamiento',
       mesNombre: 'Todos los períodos',
       headers,
       rows,
       totalImporte: total,
+      totalMargen,
       totalRegistros: pagados.length,
       nombreArchivo: 'historial_equipamiento_completo.pdf'
     });

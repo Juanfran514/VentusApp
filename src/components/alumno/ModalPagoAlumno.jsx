@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { productoService } from '../../services';
 import { getTipoPagoConfig } from '../../constants/tiposPago';
 import { MESES_NOMBRES } from '../../constants/fechas';
+import { formatCurrency } from '../../utils/formatters';
 import Modal from '../ui/Modal';
 
 const PagoAlumnoForm = ({
@@ -24,6 +25,7 @@ const PagoAlumnoForm = ({
       tipo: config.id,
       concepto: config.defaultConcepto(mesesNombres[mesIdx], añoActual),
       importe: config.defaultImporte(alumno),
+      coste: '',
       beneficio: 0,
       estadoPedido: config.id === 'material' ? 'sin_pedir' : null,
       mes: mesIdx + 1,
@@ -33,9 +35,49 @@ const PagoAlumnoForm = ({
     };
   });
 
+  const pvp = Number(formData.importe) || 0;
+  const beneficio = Number(formData.beneficio) || 0;
+  const margenPct = pvp > 0 && beneficio > 0 ? Math.round((beneficio / pvp) * 100) : null;
+
+  const handlePvpChange = (val) => {
+    const numPvp = Number(val);
+    const updates = { importe: val };
+    if (!isNaN(numPvp) && val !== '') {
+      if (formData.coste !== '' && !isNaN(Number(formData.coste))) {
+        updates.beneficio = Math.max(0, numPvp - Number(formData.coste)).toFixed(2);
+      } else if (formData.beneficio !== '' && !isNaN(Number(formData.beneficio))) {
+        updates.coste = Math.max(0, numPvp - Number(formData.beneficio)).toFixed(2);
+      }
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleCosteChange = (val) => {
+    const numCoste = Number(val);
+    const updates = { coste: val };
+    if (!isNaN(numCoste) && val !== '' && !isNaN(pvp)) {
+      updates.beneficio = Math.max(0, pvp - numCoste).toFixed(2);
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleBeneficioChange = (val) => {
+    const numBen = Number(val);
+    const updates = { beneficio: val };
+    if (!isNaN(numBen) && val !== '' && !isNaN(pvp)) {
+      updates.coste = Math.max(0, pvp - numBen).toFixed(2);
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    onSave({
+      ...formData,
+      importe: Number(formData.importe) || 0,
+      coste: formData.coste !== '' ? Number(formData.coste) : 0,
+      beneficio: formData.beneficio !== '' ? Number(formData.beneficio) : 0
+    });
   };
 
   const suggestionsMap = {
@@ -148,17 +190,113 @@ const PagoAlumnoForm = ({
         />
       </div>
 
-      <div className="form-group">
-        <label>Importe (€) *</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={formData.importe}
-          onChange={(e) => setFormData({ ...formData, importe: Number(e.target.value) })}
-          required
-        />
-      </div>
+      {config.id === 'cuota' ? (
+        <div className="form-group">
+          <label>Importe (€) *</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.importe}
+            onChange={(e) => setFormData({ ...formData, importe: Number(e.target.value) })}
+            required
+          />
+        </div>
+      ) : (
+        <div className="form-group full-width" style={{ marginTop: '0.25rem' }}>
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: 'var(--bg-dark)',
+              border: '1px solid var(--border-color)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+              }}
+            >
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                PRECIO Y MARGEN COMERCIAL
+              </span>
+              {margenPct !== null && (
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    color: '#22c55e',
+                    border: '1px solid rgba(34, 197, 94, 0.3)'
+                  }}
+                >
+                  Margen: {margenPct}% (+{formatCurrency(formData.beneficio)})
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '12px'
+              }}
+            >
+              <div>
+                <label style={{ fontSize: '0.8rem' }}>P.V.P. (€) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.importe}
+                  onChange={(e) => handlePvpChange(e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                  Lo que paga el alumno
+                </small>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem' }}>Precio Coste (€)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.coste}
+                  onChange={(e) => handleCosteChange(e.target.value)}
+                  placeholder="0.00"
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                  Coste trámite / material
+                </small>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', color: '#22c55e' }}>Beneficio Limpio (€)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.beneficio}
+                  onChange={(e) => handleBeneficioChange(e.target.value)}
+                  placeholder="0.00"
+                  style={{ borderColor: 'rgba(34, 197, 94, 0.5)' }}
+                />
+                <small style={{ color: '#22c55e', fontSize: '0.7rem' }}>
+                  Ganancia para el gimnasio
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="form-group full-width">
         <label>Estado del Pago *</label>
