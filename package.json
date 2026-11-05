@@ -13,3 +13,4 @@
     "lint:frontend": "npm --prefix frontend run lint"
   }
 }
+

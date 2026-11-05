@@ -22,3 +22,4 @@ app.get('/health', (req, res) => {
 app.listen(config.port, () => {
   console.log(`🚀 VentusApp Backend API escuchando en http://localhost:${config.port}`);
 });
+

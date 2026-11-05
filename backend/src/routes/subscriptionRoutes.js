@@ -26,3 +26,4 @@ router.get('/catalog', (req, res) => {
 });
 
 export default router;
+

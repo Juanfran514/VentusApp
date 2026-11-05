@@ -122,3 +122,4 @@ CREATE INDEX IF NOT EXISTS idx_grupos_gimnasio ON grupos(gimnasio_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_gimnasio_mes ON pagos(gimnasio_id, mes, año);
 CREATE INDEX IF NOT EXISTS idx_gastos_gimnasio_mes ON gastos(gimnasio_id, mes, año);
 CREATE INDEX IF NOT EXISTS idx_productos_gimnasio ON productos(gimnasio_id);
+
