@@ -61,7 +61,10 @@ export const reportService = {
       const al = alumnosMap[p.alumnoId];
       const nombreAl = al ? getNombreCompleto(al) : 'Alumno sin nombre';
       const tipoLabel = p.tipo ? p.tipo.charAt(0).toUpperCase() + p.tipo.slice(1) : 'Pago';
-      const conceptoStr = p.concepto || (p.tipo === 'cuota' ? `Cuota ${mesLabel} ${año}` : '-');
+      let conceptoStr = p.concepto || (p.tipo === 'cuota' ? `Cuota ${mesLabel} ${año}` : '-');
+      if (p.tipo === 'material' && Number(p.beneficio) > 0) {
+        conceptoStr += ` (Ganancia: +${formatCurrency(p.beneficio)})`;
+      }
       return [
         formatDate(p.fecha),
         nombreAl,

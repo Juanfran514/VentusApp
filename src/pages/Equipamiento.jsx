@@ -11,7 +11,7 @@ import Tabs from '../components/common/Tabs';
 import StatusBadge from '../components/common/StatusBadge';
 import SearchFilterBar from '../components/common/SearchFilterBar';
 import MonthlyAccordionList from '../components/common/MonthlyAccordionList';
-import { Plus, Trash2, RotateCcw, Package, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Package, ShoppingCart, Truck, Check } from 'lucide-react';
 import { useConfirm, useToast } from '../context/DialogContext';
 import '../pages/Alumnos.css';
 import './Equipamiento.css';
@@ -31,6 +31,10 @@ const Equipamiento = () => {
     id: null,
     nombre: '',
     precio: '',
+    coste: '',
+    beneficio: '',
+    colores: '',
+    tallas: '',
     foto: ''
   });
 
@@ -41,9 +45,13 @@ const Equipamiento = () => {
   const {
     cesta,
     totalCesta,
+    totalBeneficio,
     addProduct,
     updateCantidad,
     updatePrecio,
+    updateColor,
+    updateTalla,
+    updateEstadoPedido,
     removeProduct,
     clearCesta
   } = useCarritoVenta();
@@ -77,6 +85,24 @@ const Equipamiento = () => {
     return pagoService.separarPendientesYPagados(baseList, alumnosMap, searchPendientes);
   }, [pagosMaterial, alumnosMap, searchPendientes, filtroMaterial]);
 
+  // Lista de materiales que el gimnasio tiene pendiente pedir al proveedor
+  const porPedir = useMemo(() => {
+    let list = (pagosMaterial || []).filter(p => p.estadoPedido === 'sin_pedir');
+    if (filtroMaterial) {
+      list = list.filter(p => p.concepto === filtroMaterial);
+    }
+    if (searchPendientes) {
+      const term = searchPendientes.toLowerCase().trim();
+      list = list.filter(p => {
+        const al = alumnosMap[p.alumnoId];
+        const nombreAl = al ? getNombreCompleto(al).toLowerCase() : '';
+        const concepto = (p.concepto || '').toLowerCase();
+        return nombreAl.includes(term) || concepto.includes(term);
+      });
+    }
+    return list.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  }, [pagosMaterial, filtroMaterial, searchPendientes, alumnosMap]);
+
   const gruposMensualesPagados = useMemo(() => {
     return pagoService.agruparPagosPorMes(pagados);
   }, [pagados]);
@@ -90,7 +116,16 @@ const Equipamiento = () => {
 
   // Gestión de Productos (Catálogo)
   const handleOpenNewProduct = () => {
-    setProductForm({ id: null, nombre: '', precio: '', foto: '' });
+    setProductForm({
+      id: null,
+      nombre: '',
+      precio: '',
+      coste: '',
+      beneficio: '',
+      colores: '',
+      tallas: '',
+      foto: ''
+    });
     setIsProductModalOpen(true);
   };
 
@@ -99,6 +134,10 @@ const Equipamiento = () => {
       id: prod.id,
       nombre: prod.nombre,
       precio: prod.precio,
+      coste: prod.coste || '',
+      beneficio: prod.beneficio || '',
+      colores: Array.isArray(prod.colores) ? prod.colores.join(', ') : (prod.colores || ''),
+      tallas: Array.isArray(prod.tallas) ? prod.tallas.join(', ') : (prod.tallas || ''),
       foto: prod.foto || ''
     });
     setIsProductModalOpen(true);
@@ -108,6 +147,8 @@ const Equipamiento = () => {
     e.preventDefault();
     const nombre = productForm.nombre.trim();
     const precio = Number(productForm.precio);
+    const coste = productForm.coste !== '' ? Number(productForm.coste) : 0;
+    const beneficio = productForm.beneficio !== '' ? Number(productForm.beneficio) : 0;
 
     if (!nombre) {
       toast.warning('Introduce el nombre del producto.');
@@ -119,11 +160,21 @@ const Equipamiento = () => {
     }
 
     try {
+      const payload = {
+        nombre,
+        precio,
+        coste,
+        beneficio,
+        colores: productForm.colores,
+        tallas: productForm.tallas,
+        foto: productForm.foto
+      };
+
       if (productForm.id) {
-        await productoService.update(productForm.id, { nombre, precio, foto: productForm.foto });
+        await productoService.update(productForm.id, payload);
         toast.success('Producto actualizado');
       } else {
-        await productoService.create({ nombre, precio, foto: productForm.foto });
+        await productoService.create(payload);
         toast.success('Producto añadido al catálogo');
       }
       setIsProductModalOpen(false);
@@ -187,7 +238,7 @@ const Equipamiento = () => {
     }
   };
 
-  // Acciones sobre registros de pago
+  // Acciones sobre registros de pago y pedidos
   const handleMarcarPagado = async (id) => {
     await pagoService.marcarPagado(id);
     toast.success('Equipamiento marcado como cobrado');
@@ -206,6 +257,21 @@ const Equipamiento = () => {
     }
   };
 
+  const handleToggleEstadoPedido = async (id, actualEstado) => {
+    const nuevo = actualEstado === 'pedido' ? 'sin_pedir' : 'pedido';
+    try {
+      await pagoService.cambiarEstadoPedido(id, nuevo);
+      toast.success(
+        nuevo === 'pedido'
+          ? 'Material marcado como pedido'
+          : 'Material marcado como pendiente de pedir'
+      );
+    } catch (err) {
+      console.error('Error actualizando pedido:', err);
+      toast.error('Error al cambiar el estado del pedido.');
+    }
+  };
+
   const handleDeletePago = async (id) => {
     const ok = await confirm({
       title: 'Eliminar registro',
@@ -221,12 +287,13 @@ const Equipamiento = () => {
 
   // Exportación a PDF
   const handleExportPdfMes = async (grupo) => {
-    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'Importe'];
+    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'PVP', 'Margen'];
     const rows = grupo.items.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
       p.concepto,
-      formatCurrency(p.importe)
+      formatCurrency(p.importe),
+      p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
     await exportarMesAPdf({
       titulo: 'Informe de Equipamiento',
@@ -240,12 +307,13 @@ const Equipamiento = () => {
   };
 
   const handleExportTodoPdf = async () => {
-    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'Importe'];
+    const headers = ['Fecha', 'Alumno', 'Material / Concepto', 'PVP', 'Margen'];
     const rows = pagados.map(p => [
       formatDate(p.fecha),
       getNombreCompleto(alumnosMap[p.alumnoId]),
       p.concepto,
-      formatCurrency(p.importe)
+      formatCurrency(p.importe),
+      p.beneficio ? `+${formatCurrency(p.beneficio)}` : '-'
     ]);
     const total = pagados.reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
     await exportarMesAPdf({
@@ -264,6 +332,13 @@ const Equipamiento = () => {
       id: 'catalogo',
       label: `Catálogo (${productos.length})`,
       icon: <Package size={18} />
+    },
+    {
+      id: 'por_pedir',
+      label: 'Por Pedir',
+      badge: porPedir.length,
+      badgeVariant: 'warning',
+      icon: <Truck size={18} />
     },
     {
       id: 'pendientes',
@@ -292,7 +367,7 @@ const Equipamiento = () => {
         <div>
           <h1>Gestión de Equipamiento</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '-0.5rem' }}>
-            Catálogo de productos bajo demanda, asignación rápida y control de cobros.
+            Catálogo de productos con variantes y control de pedidos a proveedores y cobros.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -310,6 +385,7 @@ const Equipamiento = () => {
       <div className="card">
         <Tabs tabs={tabsConfig} activeTab={activeTab} onChange={setActiveTab} />
 
+        {/* PESTAÑA: CATÁLOGO */}
         {activeTab === 'catalogo' && (
           <CatalogoProductosTab
             searchCatalogo={searchCatalogo}
@@ -321,6 +397,103 @@ const Equipamiento = () => {
           />
         )}
 
+        {/* PESTAÑA: MATERIAL PENDIENTE DE PEDIR A PROVEEDOR */}
+        {activeTab === 'por_pedir' && (
+          <div>
+            <SearchFilterBar
+              search={searchPendientes}
+              onSearchChange={setSearchPendientes}
+              searchPlaceholder="Buscar por alumno o material por pedir..."
+              filterValue={filtroMaterial}
+              onFilterChange={setFiltroMaterial}
+              filterOptions={materialesUnicos}
+              filterPlaceholder="Todos los materiales"
+            />
+
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Alumno</th>
+                    <th>Material y Variantes</th>
+                    <th>PVP (Alumno)</th>
+                    <th>Estado Pago</th>
+                    <th>Logística Pedido</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porPedir.map(pago => (
+                    <tr key={pago.id} style={{ background: 'rgba(245, 158, 11, 0.05)' }}>
+                      <td>{formatDate(pago.fecha)}</td>
+                      <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
+                      <td>
+                        <strong>{pago.concepto}</strong>
+                        {pago.beneficio > 0 && (
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#22c55e' }}>
+                            Margen gym: +{formatCurrency(pago.beneficio)}
+                          </span>
+                        )}
+                      </td>
+                      <td>{formatCurrency(pago.importe)}</td>
+                      <td><StatusBadge status={pago.estado} /></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-pedido-badge badge-sin-pedir"
+                          onClick={() => handleToggleEstadoPedido(pago.id, pago.estadoPedido)}
+                          title="Clic para marcar como pedido"
+                        >
+                          Sin pedir
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          className="btn-primary"
+                          style={{ padding: '4px 10px', fontSize: '0.85em', marginRight: '6px' }}
+                          onClick={() => handleToggleEstadoPedido(pago.id, 'sin_pedir')}
+                        >
+                          <Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                          Marcar Pedido
+                        </button>
+                        {pago.estado === 'pendiente' && (
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.85em', marginRight: '6px' }}
+                            onClick={() => handleMarcarPagado(pago.id)}
+                            title="Cobrar ahora"
+                          >
+                            Cobrar
+                          </button>
+                        )}
+                        <button
+                          className="btn-icon text-danger"
+                          title="Eliminar registro"
+                          onClick={() => handleDeletePago(pago.id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {porPedir.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="text-center" style={{ padding: '2.5rem' }}>
+                        <div style={{ color: 'var(--text-muted)' }}>
+                          <Truck size={36} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+                          <p>¡Todo al día! No hay material pendiente de pedir al proveedor.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* PESTAÑA: PENDIENTES DE COBRO */}
         {activeTab === 'pendientes' && (
           <div>
             <SearchFilterBar
@@ -340,8 +513,9 @@ const Equipamiento = () => {
                     <th>Fecha</th>
                     <th>Alumno</th>
                     <th>Material / Concepto</th>
-                    <th>Importe</th>
-                    <th>Estado</th>
+                    <th>P.V.P.</th>
+                    <th>Logística</th>
+                    <th>Estado Cobro</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -350,8 +524,25 @@ const Equipamiento = () => {
                     <tr key={pago.id} style={{ background: 'rgba(239, 68, 68, 0.05)' }}>
                       <td>{formatDate(pago.fecha)}</td>
                       <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
-                      <td>{pago.concepto}</td>
-                      <td>{formatCurrency(pago.importe)}</td>
+                      <td>
+                        {pago.concepto}
+                        {pago.beneficio > 0 && (
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#22c55e' }}>
+                            Ganancia: +{formatCurrency(pago.beneficio)}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{formatCurrency(pago.importe)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`btn-pedido-badge ${pago.estadoPedido === 'pedido' ? 'badge-pedido' : 'badge-sin-pedir'}`}
+                          onClick={() => handleToggleEstadoPedido(pago.id, pago.estadoPedido)}
+                          title="Clic para alternar estado (Sin pedir / Pedido)"
+                        >
+                          {pago.estadoPedido === 'pedido' ? 'Pedido' : 'Sin pedir'}
+                        </button>
+                      </td>
                       <td><StatusBadge status={pago.estado} /></td>
                       <td>
                         <button
@@ -373,7 +564,7 @@ const Equipamiento = () => {
                   ))}
                   {pendientes.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center" style={{ padding: '2rem' }}>
+                      <td colSpan="7" className="text-center" style={{ padding: '2rem' }}>
                         No hay equipamiento pendiente de cobro.
                       </td>
                     </tr>
@@ -384,6 +575,7 @@ const Equipamiento = () => {
           </div>
         )}
 
+        {/* PESTAÑA: HISTORIAL (PAGADOS) */}
         {activeTab === 'pagados' && (
           <MonthlyAccordionList
             gruposMensuales={gruposMensualesPagados}
@@ -400,7 +592,8 @@ const Equipamiento = () => {
                       <th>Fecha</th>
                       <th>Alumno</th>
                       <th>Material / Concepto</th>
-                      <th>Importe</th>
+                      <th>P.V.P.</th>
+                      <th>Logística</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
@@ -410,9 +603,26 @@ const Equipamiento = () => {
                       <tr key={pago.id}>
                         <td>{formatDate(pago.fecha)}</td>
                         <td><strong>{getNombreCompleto(alumnosMap[pago.alumnoId])}</strong></td>
-                        <td>{pago.concepto}</td>
+                        <td>
+                          {pago.concepto}
+                          {pago.beneficio > 0 && (
+                            <span style={{ display: 'block', fontSize: '0.75rem', color: '#22c55e' }}>
+                              Ganancia: +{formatCurrency(pago.beneficio)}
+                            </span>
+                          )}
+                        </td>
                         <td style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>
                           +{formatCurrency(pago.importe)}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={`btn-pedido-badge ${pago.estadoPedido === 'pedido' ? 'badge-pedido' : 'badge-sin-pedir'}`}
+                            onClick={() => handleToggleEstadoPedido(pago.id, pago.estadoPedido)}
+                            title="Clic para alternar estado (Sin pedir / Pedido)"
+                          >
+                            {pago.estadoPedido === 'pedido' ? 'Pedido' : 'Sin pedir'}
+                          </button>
                         </td>
                         <td><StatusBadge status={pago.estado} /></td>
                         <td>
@@ -463,9 +673,13 @@ const Equipamiento = () => {
         setSaleEstado={setSaleEstado}
         cesta={cesta}
         totalCesta={totalCesta}
+        totalBeneficio={totalBeneficio}
         onAddProduct={addProduct}
         onUpdateCantidad={updateCantidad}
         onUpdatePrecio={updatePrecio}
+        onUpdateColor={updateColor}
+        onUpdateTalla={updateTalla}
+        onUpdateEstadoPedido={updateEstadoPedido}
         onRemoveProduct={removeProduct}
         onSubmit={handleSubmitSale}
       />

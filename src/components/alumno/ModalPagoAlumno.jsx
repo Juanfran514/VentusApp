@@ -24,6 +24,8 @@ const PagoAlumnoForm = ({
       tipo: config.id,
       concepto: config.defaultConcepto(mesesNombres[mesIdx], añoActual),
       importe: config.defaultImporte(alumno),
+      beneficio: 0,
+      estadoPedido: config.id === 'material' ? 'sin_pedir' : null,
       mes: mesIdx + 1,
       año: añoActual,
       fecha: now.toISOString().split('T')[0],
@@ -96,7 +98,9 @@ const PagoAlumnoForm = ({
                     setFormData(prev => ({
                       ...prev,
                       concepto: prod.nombre,
-                      importe: Number(prod.precio) || 0
+                      importe: Number(prod.precio) || 0,
+                      beneficio: Number(prod.beneficio) || 0,
+                      productoId: prod.id
                     }));
                   }
                 }}
@@ -167,6 +171,19 @@ const PagoAlumnoForm = ({
           <option value="pendiente">Pendiente (Adeudo)</option>
         </select>
       </div>
+
+      {config.id === 'material' && (
+        <div className="form-group full-width">
+          <label>Logística del Material</label>
+          <select
+            value={formData.estadoPedido || 'sin_pedir'}
+            onChange={(e) => setFormData({ ...formData, estadoPedido: e.target.value })}
+          >
+            <option value="sin_pedir">Pendiente de pedir al proveedor</option>
+            <option value="pedido">Ya pedido al proveedor</option>
+          </select>
+        </div>
+      )}
 
       <div className="form-actions full-width">
         <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>

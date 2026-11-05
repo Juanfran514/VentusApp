@@ -61,17 +61,31 @@ export const pagoService = {
       const cantidad = Math.max(1, Number(item.cantidad) || 1);
       const precioUnitario = Number(item.precio) || 0;
       const totalLinea = Number((precioUnitario * cantidad).toFixed(2));
+      const beneficioUnitario = Number(item.beneficio) || 0;
+      const totalBeneficio = Number((beneficioUnitario * cantidad).toFixed(2));
+
+      const variantParts = [];
+      if (item.selectedColor) variantParts.push(item.selectedColor);
+      if (item.selectedTalla) variantParts.push(item.selectedTalla);
+      const variantStr = variantParts.length > 0 ? ` (${variantParts.join(' / ')})` : '';
+
+      const baseName = item.nombre || 'Material';
       const concepto = cantidad > 1 
-        ? `${item.nombre} (x${cantidad})` 
-        : item.nombre;
+        ? `${baseName}${variantStr} (x${cantidad})` 
+        : `${baseName}${variantStr}`;
 
       return new Pago({
         alumnoId: Number(alumnoId),
         tipo: 'material',
         concepto,
         importe: totalLinea,
+        beneficio: totalBeneficio,
         fecha: fechaIso,
-        estado
+        estado,
+        estadoPedido: item.estadoPedido || 'sin_pedir',
+        color: item.selectedColor || '',
+        talla: item.selectedTalla || '',
+        productoId: item.productoId ? Number(item.productoId) : null
       });
     });
 
@@ -83,6 +97,13 @@ export const pagoService = {
       }
       return ids;
     });
+  },
+
+  /**
+   * Cambia el estado logístico del pedido ('sin_pedir' | 'pedido')
+   */
+  async cambiarEstadoPedido(id, nuevoEstadoPedido) {
+    return db.pagos.update(Number(id), { estadoPedido: nuevoEstadoPedido });
   },
 
   /**

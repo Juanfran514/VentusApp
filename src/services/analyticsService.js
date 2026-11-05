@@ -41,6 +41,30 @@ export const analyticsService = {
       .reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
   },
 
+  /**
+   * Calcula la ganancia operativa bruta del mes:
+   * Para cuotas, exámenes y licencias: suma el 100% del importe.
+   * Para equipamiento/material: suma únicamente el beneficio limpio del gimnasio.
+   */
+  calcularGananciaOperativaMes(pagos = [], mes, año) {
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+    return pagos
+      .filter(p => Number(p.mes) === mesNum && Number(p.año) === añoNum && p.estado === 'pagado')
+      .reduce((sum, p) => {
+        if (p.tipo === 'material') {
+          return sum + (Number(p.beneficio !== undefined ? p.beneficio : 0) || 0);
+        }
+        return sum + (Number(p.importe) || 0);
+      }, 0);
+  },
+
+  calcularBeneficioNetoMes(pagos = [], gastos = [], mes, año) {
+    const ganancia = this.calcularGananciaOperativaMes(pagos, mes, año);
+    const gastosTotal = this.calcularGastosMes(gastos, mes, año);
+    return ganancia - gastosTotal;
+  },
+
   calcularGastosMes(gastos = [], mes, año) {
     const mesNum = Number(mes);
     const añoNum = Number(año);
@@ -160,6 +184,15 @@ export const analyticsService = {
         .filter(p => Number(p.mes) === m && Number(p.año) === añoNum && p.estado === 'pagado')
         .reduce((sum, p) => sum + (Number(p.importe) || 0), 0);
 
+      const gainForMonth = pagos
+        .filter(p => Number(p.mes) === m && Number(p.año) === añoNum && p.estado === 'pagado')
+        .reduce((sum, p) => {
+          if (p.tipo === 'material') {
+            return sum + (Number(p.beneficio !== undefined ? p.beneficio : 0) || 0);
+          }
+          return sum + (Number(p.importe) || 0);
+        }, 0);
+
       const expensesForMonth = gastos
         .filter(g => {
           const date = new Date(g.fecha);
@@ -170,6 +203,7 @@ export const analyticsService = {
       data.push({
         name: MESES_CORTOS[m - 1],
         Ingresos: incomeForMonth,
+        Ganancia: gainForMonth,
         Gastos: expensesForMonth
       });
     }

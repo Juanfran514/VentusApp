@@ -16,9 +16,13 @@ const ModalVentaMultiple = ({
   setSaleEstado,
   cesta,
   totalCesta,
+  totalBeneficio = 0,
   onAddProduct,
   onUpdateCantidad,
   onUpdatePrecio,
+  onUpdateColor,
+  onUpdateTalla,
+  onUpdateEstadoPedido,
   onRemoveProduct,
   onSubmit
 }) => {
@@ -73,7 +77,7 @@ const ModalVentaMultiple = ({
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Añadir Productos del Catálogo</span>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Haz clic en un producto para añadirlo
+              Haz clic en un producto para añadirlo a la cesta
             </span>
           </label>
 
@@ -143,27 +147,43 @@ const ModalVentaMultiple = ({
         <div className="form-group full-width">
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Cesta de Artículos ({cesta.length})</span>
+            {totalBeneficio > 0 && (
+              <span style={{ fontSize: '0.8rem', color: '#22c55e', fontWeight: 600 }}>
+                Ganancia estimada: +{formatCurrency(totalBeneficio)}
+              </span>
+            )}
           </label>
 
           {cesta.length > 0 ? (
-            <div>
-              <table className="cesta-table">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="cesta-table" style={{ width: '100%', minWidth: '550px' }}>
                 <thead>
                   <tr>
-                    <th>Artículo</th>
-                    <th style={{ textAlign: 'center', width: '100px' }}>Cant.</th>
+                    <th>Artículo y Variantes</th>
+                    <th style={{ width: '120px' }}>Logística</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Cant.</th>
                     <th style={{ width: '85px' }}>Precio</th>
                     <th style={{ width: '85px' }}>Subtotal</th>
-                    <th style={{ width: '40px' }}></th>
+                    <th style={{ width: '35px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {cesta.map((item, idx) => {
                     const subtotal = (Number(item.precio) || 0) * (Number(item.cantidad) || 1);
+                    const subBeneficio = (Number(item.beneficio) || 0) * (Number(item.cantidad) || 1);
+
+                    const coloresList = Array.isArray(item.colores)
+                      ? item.colores
+                      : (item.colores ? item.colores.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+                    const tallasList = Array.isArray(item.tallas)
+                      ? item.tallas
+                      : (item.tallas ? item.tallas.split(',').map(s => s.trim()).filter(Boolean) : []);
+
                     return (
                       <tr key={idx}>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             {item.foto ? (
                               <img
                                 src={item.foto}
@@ -175,7 +195,78 @@ const ModalVentaMultiple = ({
                             )}
                             <strong>{item.nombre}</strong>
                           </div>
+
+                          {/* Variantes: Selector o Input de Color y Talla */}
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {coloresList.length > 0 ? (
+                              <select
+                                value={item.selectedColor || ''}
+                                onChange={(e) => onUpdateColor(idx, e.target.value)}
+                                style={{ padding: '2px 6px', fontSize: '0.75rem', borderRadius: '4px' }}
+                              >
+                                <option value="">Color (Elige)</option>
+                                {coloresList.map((col, cIdx) => (
+                                  <option key={cIdx} value={col}>
+                                    {col}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Color (opc.)"
+                                value={item.selectedColor || ''}
+                                onChange={(e) => onUpdateColor(idx, e.target.value)}
+                                style={{ width: '85px', padding: '2px 6px', fontSize: '0.75rem' }}
+                              />
+                            )}
+
+                            {tallasList.length > 0 ? (
+                              <select
+                                value={item.selectedTalla || ''}
+                                onChange={(e) => onUpdateTalla(idx, e.target.value)}
+                                style={{ padding: '2px 6px', fontSize: '0.75rem', borderRadius: '4px' }}
+                              >
+                                <option value="">Talla/oz (Elige)</option>
+                                {tallasList.map((tal, tIdx) => (
+                                  <option key={tIdx} value={tal}>
+                                    {tal}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Talla/oz (opc.)"
+                                value={item.selectedTalla || ''}
+                                onChange={(e) => onUpdateTalla(idx, e.target.value)}
+                                style={{ width: '85px', padding: '2px 6px', fontSize: '0.75rem' }}
+                              />
+                            )}
+                          </div>
                         </td>
+
+                        {/* Estado Logístico: Pedido / Sin pedir */}
+                        <td>
+                          <select
+                            value={item.estadoPedido || 'sin_pedir'}
+                            onChange={(e) => onUpdateEstadoPedido(idx, e.target.value)}
+                            style={{
+                              padding: '4px 6px',
+                              fontSize: '0.75rem',
+                              borderRadius: '4px',
+                              borderColor: item.estadoPedido === 'pedido' ? '#38bdf8' : '#f59e0b',
+                              color: item.estadoPedido === 'pedido' ? '#38bdf8' : '#f59e0b',
+                              fontWeight: 600,
+                              background: 'var(--bg-dark)'
+                            }}
+                          >
+                            <option value="sin_pedir">Sin pedir</option>
+                            <option value="pedido">Pedido</option>
+                          </select>
+                        </td>
+
+                        {/* Cantidad */}
                         <td style={{ textAlign: 'center' }}>
                           <div className="cesta-qty-controls">
                             <button
@@ -195,6 +286,8 @@ const ModalVentaMultiple = ({
                             </button>
                           </div>
                         </td>
+
+                        {/* Precio */}
                         <td>
                           <input
                             type="number"
@@ -202,10 +295,25 @@ const ModalVentaMultiple = ({
                             min="0"
                             value={item.precio}
                             onChange={(e) => onUpdatePrecio(idx, e.target.value)}
-                            style={{ width: '75px', padding: '3px 6px', fontSize: '0.85rem' }}
+                            style={{ width: '70px', padding: '3px 6px', fontSize: '0.85rem' }}
                           />
+                          {item.beneficio > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#22c55e', marginTop: '2px' }}>
+                              +{formatCurrency(item.beneficio)} gan.
+                            </div>
+                          )}
                         </td>
-                        <td style={{ fontWeight: 'bold' }}>{formatCurrency(subtotal)}</td>
+
+                        {/* Subtotal */}
+                        <td>
+                          <div style={{ fontWeight: 'bold' }}>{formatCurrency(subtotal)}</div>
+                          {subBeneficio > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                              +{formatCurrency(subBeneficio)} net
+                            </div>
+                          )}
+                        </td>
+
                         <td>
                           <button
                             type="button"
@@ -222,11 +330,23 @@ const ModalVentaMultiple = ({
                 </tbody>
               </table>
 
-              <div className="cesta-total-box">
-                <span className="cesta-total-label">
-                  Total a {saleEstado === 'pendiente' ? 'asignar (Deuda)' : 'cobrar'}:
-                </span>
-                <span className="cesta-total-amount">{formatCurrency(totalCesta)}</span>
+              <div className="cesta-total-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span className="cesta-total-label">
+                    Total a {saleEstado === 'pendiente' ? 'asignar (Deuda)' : 'cobrar'}:
+                  </span>
+                  <span className="cesta-total-amount">{formatCurrency(totalCesta)}</span>
+                </div>
+                {totalBeneficio > 0 && (
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block' }}>
+                      Ganancia Neta Gimnasio:
+                    </span>
+                    <strong style={{ fontSize: '1.05rem', color: '#22c55e' }}>
+                      +{formatCurrency(totalBeneficio)}
+                    </strong>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -264,4 +384,3 @@ const ModalVentaMultiple = ({
 };
 
 export default ModalVentaMultiple;
-

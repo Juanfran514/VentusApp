@@ -19,6 +19,11 @@ export class VentusDatabase extends Dexie {
     this.version(3).stores({
       productos: '++id, nombre, precio, activo'
     });
+
+    this.version(4).stores({
+      productos: '++id, nombre, precio, activo',
+      pagos: '++id, alumnoId, tipo, mes, año, importe, fecha, estadoPedido'
+    });
   }
 }
 
@@ -90,9 +95,14 @@ export class Pago {
     mes = null,
     año = null,
     importe = 0,
+    beneficio = 0,
     fecha = new Date().toISOString(),
     concepto = '',
-    estado = 'pagado'
+    estado = 'pagado',
+    estadoPedido = 'sin_pedir',
+    color = '',
+    talla = '',
+    productoId = null
   } = {}) {
     const d = fecha ? new Date(fecha) : new Date();
     const validDate = !isNaN(d.getTime()) ? d : new Date();
@@ -102,9 +112,14 @@ export class Pago {
     this.mes = mes !== null && mes !== undefined && mes !== '' ? Number(mes) : validDate.getMonth() + 1;
     this.año = año !== null && año !== undefined && año !== '' ? Number(año) : validDate.getFullYear();
     this.importe = Number(importe) || 0;
+    this.beneficio = Number(beneficio) || 0;
     this.fecha = fecha;
     this.concepto = concepto;
     this.estado = estado; // 'pagado' o 'pendiente'
+    this.estadoPedido = tipo === 'material' ? (estadoPedido || 'sin_pedir') : null;
+    this.color = color || '';
+    this.talla = talla || '';
+    this.productoId = productoId ? Number(productoId) : null;
   }
 }
 
@@ -155,12 +170,28 @@ export class Producto {
   constructor({
     nombre = '',
     precio = 0,
+    coste = 0,
+    beneficio = 0,
+    colores = [],
+    tallas = [],
     foto = '',
     activo = true,
     fechaCreacion = new Date().toISOString()
   } = {}) {
     this.nombre = nombre;
-    this.precio = precio;
+    this.precio = Number(precio) || 0;
+    this.coste = Number(coste) || 0;
+    this.beneficio = Number(beneficio) || 0;
+    this.colores = Array.isArray(colores)
+      ? colores
+      : typeof colores === 'string'
+      ? colores.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    this.tallas = Array.isArray(tallas)
+      ? tallas
+      : typeof tallas === 'string'
+      ? tallas.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
     this.foto = foto;
     this.activo = activo;
     this.fechaCreacion = fechaCreacion;

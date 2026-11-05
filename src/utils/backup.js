@@ -36,7 +36,7 @@ export const exportarCopiaSeguridad = async () => {
 
   const backupData = {
     app: 'VentusApp',
-    version: 3,
+    version: 4,
     fecha: new Date().toISOString(),
     data: {
       alumnos,

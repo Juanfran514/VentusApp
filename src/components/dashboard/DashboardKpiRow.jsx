@@ -5,6 +5,7 @@ const DashboardKpiRow = ({
   activeStudentsCount,
   currentMonthIncome,
   currentMonthExpenses,
+  currentMonthGain,
   estadoFijosMes,
   netProfit,
   dineroPorRecaudar
@@ -32,7 +33,7 @@ const DashboardKpiRow = ({
         <div className="kpi-value negative">-{formatCurrency(currentMonthExpenses)}</div>
         {estadoFijosMes.totalPendiente > 0 ? (
           <div className="kpi-subtext" style={{ color: '#d97706', fontWeight: 600 }}>
-            ⚠️ {estadoFijosMes.countPendientes} fijos pendientes: -
+            {estadoFijosMes.countPendientes} fijos pendientes: -
             {formatCurrency(estadoFijosMes.totalPendiente)}
           </div>
         ) : (
@@ -49,6 +50,11 @@ const DashboardKpiRow = ({
         <div className={`kpi-value ${netProfit >= 0 ? 'positive' : 'negative'}`}>
           {formatCurrency(netProfit)}
         </div>
+        {currentMonthGain !== undefined && currentMonthIncome !== currentMonthGain && (
+          <div className="kpi-subtext" style={{ color: 'var(--text-muted)' }}>
+            Margen bruto: {formatCurrency(currentMonthGain)}
+          </div>
+        )}
       </div>
 
       <div className="kpi-card kpi-warning">

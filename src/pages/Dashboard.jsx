@@ -48,6 +48,11 @@ const Dashboard = () => {
     [pagos, selectedMonth, selectedYear]
   );
 
+  const currentMonthGain = useMemo(
+    () => analyticsService.calcularGananciaOperativaMes(pagos, selectedMonth, selectedYear),
+    [pagos, selectedMonth, selectedYear]
+  );
+
   const estadoFijosMes = useMemo(
     () => gastoService.calcularEstadoFijosMes(gastosFijos, gastos, selectedMonth, selectedYear),
     [gastosFijos, gastos, selectedMonth, selectedYear]
@@ -58,7 +63,7 @@ const Dashboard = () => {
     [gastos, selectedMonth, selectedYear]
   );
 
-  const netProfit = currentMonthIncome - currentMonthExpenses;
+  const netProfit = currentMonthGain - currentMonthExpenses;
 
   const dineroPorRecaudar = useMemo(
     () => analyticsService.calcularDineroPorRecaudar(alumnos, pagos, selectedMonth, selectedYear),
@@ -156,6 +161,7 @@ const Dashboard = () => {
         activeStudentsCount={activeStudentsCount}
         currentMonthIncome={currentMonthIncome}
         currentMonthExpenses={currentMonthExpenses}
+        currentMonthGain={currentMonthGain}
         estadoFijosMes={estadoFijosMes}
         netProfit={netProfit}
         dineroPorRecaudar={dineroPorRecaudar}
