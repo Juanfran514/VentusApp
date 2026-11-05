@@ -1,19 +1,83 @@
-import { db, Producto } from '../db/db';
+import { supabase, getActiveGimnasioId } from '../supabase';
+
+const mapFromDb = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    gimnasioId: row.gimnasio_id,
+    nombre: row.nombre,
+    precio: Number(row.precio) || 0,
+    coste: Number(row.coste) || 0,
+    beneficio: Number(row.beneficio) || 0,
+    colores: row.colores || [],
+    tallas: row.tallas || [],
+    foto: row.foto || '',
+    activo: row.activo !== false,
+    fechaCreacion: row.created_at
+  };
+};
+
+const mapToDb = (data, gimnasioId) => {
+  const row = {};
+  if (gimnasioId) row.gimnasio_id = gimnasioId;
+  if (data.nombre !== undefined) row.nombre = (data.nombre || '').trim();
+  if (data.precio !== undefined) row.precio = Number(data.precio) || 0;
+  if (data.coste !== undefined) row.coste = Number(data.coste) || 0;
+  if (data.beneficio !== undefined) row.beneficio = Number(data.beneficio) || 0;
+  if (data.foto !== undefined) row.foto = data.foto;
+  if (data.activo !== undefined) row.activo = data.activo;
+
+  if (data.colores !== undefined) {
+    row.colores = Array.isArray(data.colores)
+      ? data.colores
+      : typeof data.colores === 'string'
+      ? data.colores.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+  }
+
+  if (data.tallas !== undefined) {
+    row.tallas = Array.isArray(data.tallas)
+      ? data.tallas
+      : typeof data.tallas === 'string'
+      ? data.tallas.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+  }
+
+  return row;
+};
 
 export const productoService = {
   /**
    * Obtiene todos los productos registrados
    */
   async getAll() {
-    return db.productos.toArray();
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .order('nombre', { ascending: true });
+
+    if (error) {
+      console.error('Error en productoService.getAll:', error);
+      return [];
+    }
+    return (data || []).map(mapFromDb);
   },
 
   /**
    * Obtiene únicamente los productos activos
    */
   async getActivos() {
-    const todos = await db.productos.toArray();
-    return todos.filter(p => p.activo !== false);
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('activo', true)
+      .order('nombre', { ascending: true });
+
+    if (error) {
+      console.error('Error en productoService.getActivos:', error);
+      return [];
+    }
+    return (data || []).map(mapFromDb);
   },
 
   /**
@@ -21,75 +85,72 @@ export const productoService = {
    */
   async getById(id) {
     if (!id) return null;
-    return db.productos.get(Number(id));
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error en productoService.getById:', error);
+      return null;
+    }
+    return mapFromDb(data);
   },
 
   /**
    * Crea un nuevo producto en el catálogo
    */
   async create(data) {
-    const colores = Array.isArray(data.colores)
-      ? data.colores
-      : typeof data.colores === 'string'
-      ? data.colores.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
+    const gimnasioId = await getActiveGimnasioId();
+    const payload = mapToDb(data, gimnasioId);
 
-    const tallas = Array.isArray(data.tallas)
-      ? data.tallas
-      : typeof data.tallas === 'string'
-      ? data.tallas.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
+    const { data: inserted, error } = await supabase
+      .from('productos')
+      .insert([payload])
+      .select()
+      .single();
 
-    const producto = new Producto({
-      nombre: (data.nombre || '').trim(),
-      precio: Number(data.precio) || 0,
-      coste: Number(data.coste) || 0,
-      beneficio: Number(data.beneficio) || 0,
-      colores,
-      tallas,
-      foto: data.foto || '',
-      activo: data.activo !== undefined ? data.activo : true,
-      fechaCreacion: new Date().toISOString()
-    });
-
-    return db.productos.add(producto);
+    if (error) throw error;
+    return mapFromDb(inserted);
   },
 
   /**
-   * Actualiza los datos de un producto existente
+   * Actualiza un producto existente
    */
   async update(id, data) {
-    const camposActualizar = {
-      ...(data.nombre !== undefined && { nombre: data.nombre.trim() }),
-      ...(data.precio !== undefined && { precio: Number(data.precio) }),
-      ...(data.coste !== undefined && { coste: Number(data.coste) }),
-      ...(data.beneficio !== undefined && { beneficio: Number(data.beneficio) }),
-      ...(data.colores !== undefined && {
-        colores: Array.isArray(data.colores)
-          ? data.colores
-          : typeof data.colores === 'string'
-          ? data.colores.split(',').map(s => s.trim()).filter(Boolean)
-          : []
-      }),
-      ...(data.tallas !== undefined && {
-        tallas: Array.isArray(data.tallas)
-          ? data.tallas
-          : typeof data.tallas === 'string'
-          ? data.tallas.split(',').map(s => s.trim()).filter(Boolean)
-          : []
-      }),
-      ...(data.foto !== undefined && { foto: data.foto }),
-      ...(data.activo !== undefined && { activo: data.activo })
-    };
+    const payload = mapToDb(data);
+    const { data: updated, error } = await supabase
+      .from('productos')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
 
-    return db.productos.update(Number(id), camposActualizar);
+    if (error) throw error;
+    return mapFromDb(updated);
   },
 
   /**
-   * Elimina un producto del catálogo
+   * Alterna el estado activo/inactivo de un producto
+   */
+  async toggleActivo(producto) {
+    if (!producto?.id) return;
+    const nuevoEstado = !producto.activo;
+    await this.update(producto.id, { activo: nuevoEstado });
+    return nuevoEstado;
+  },
+
+  /**
+   * Elimina un producto por su ID
    */
   async delete(id) {
-    return db.productos.delete(Number(id));
+    const { error } = await supabase
+      .from('productos')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
   }
 };
-

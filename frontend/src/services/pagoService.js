@@ -1,14 +1,65 @@
-import { db, Pago } from '../db/db';
+import { supabase, getActiveGimnasioId } from '../supabase';
 import { getNombreCompleto } from '../utils/formatters';
 import { saveStoredCategoria, DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS } from '../utils/categorias';
 import { MESES_NOMBRES } from '../constants/fechas';
+
+const mapFromDb = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    alumnoId: row.alumno_id,
+    tipo: row.tipo,
+    mes: row.mes,
+    año: row.año,
+    importe: Number(row.importe) || 0,
+    beneficio: Number(row.beneficio) || 0,
+    fecha: row.fecha,
+    concepto: row.concepto || '',
+    estado: row.estado,
+    estadoPedido: row.estado_pedido,
+    color: row.color || '',
+    talla: row.talla || '',
+    productoId: row.producto_id
+  };
+};
+
+const mapToDb = (data, gimnasioId) => {
+  const d = data.fecha ? new Date(data.fecha) : new Date();
+  const validDate = !isNaN(d.getTime()) ? d : new Date();
+
+  return {
+    gimnasio_id: gimnasioId,
+    alumno_id: data.alumnoId,
+    tipo: data.tipo || 'cuota',
+    mes: data.mes !== null && data.mes !== undefined && data.mes !== '' ? Number(data.mes) : validDate.getMonth() + 1,
+    año: data.año !== null && data.año !== undefined && data.año !== '' ? Number(data.año) : validDate.getFullYear(),
+    importe: Number(data.importe) || 0,
+    beneficio: Number(data.beneficio) || 0,
+    fecha: data.fecha || validDate.toISOString(),
+    concepto: data.concepto || '',
+    estado: data.estado || 'pagado',
+    estado_pedido: data.tipo === 'material' ? (data.estadoPedido || 'sin_pedir') : null,
+    color: data.color || '',
+    talla: data.talla || '',
+    producto_id: data.productoId || null
+  };
+};
 
 export const pagoService = {
   /**
    * Obtiene todos los pagos ordenados por fecha descendente
    */
   async getAll() {
-    return db.pagos.toArray();
+    const { data, error } = await supabase
+      .from('pagos')
+      .select('*')
+      .order('fecha', { ascending: false });
+
+    if (error) {
+      console.error('Error en pagoService.getAll:', error);
+      return [];
+    }
+    return (data || []).map(mapFromDb);
   },
 
   /**
@@ -16,48 +67,70 @@ export const pagoService = {
    */
   async getByAlumno(alumnoId) {
     if (!alumnoId) return [];
-    return db.pagos.where('alumnoId').equals(Number(alumnoId)).toArray();
+    const { data, error } = await supabase
+      .from('pagos')
+      .select('*')
+      .eq('alumno_id', alumnoId)
+      .order('fecha', { ascending: false });
+
+    if (error) {
+      console.error('Error en pagoService.getByAlumno:', error);
+      return [];
+    }
+    return (data || []).map(mapFromDb);
   },
 
   /**
-   * Obtiene los pagos de un tipo específico ('cuota', 'examen', 'material', 'licencia')
+   * Obtiene los pagos de un tipo ('cuota', 'examen', 'material', 'licencia')
    */
   async getByTipo(tipo) {
-    if (!tipo) return db.pagos.toArray();
-    return db.pagos.where('tipo').equals(tipo).toArray();
+    let query = supabase.from('pagos').select('*').order('fecha', { ascending: false });
+    if (tipo) {
+      query = query.eq('tipo', tipo);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error en pagoService.getByTipo:', error);
+      return [];
+    }
+    return (data || []).map(mapFromDb);
   },
 
   /**
    * Crea un nuevo registro de pago
    */
   async create(data) {
-    const pagoInstance = new Pago({
-      ...data,
-      alumnoId: Number(data.alumnoId),
-      importe: Number(data.importe),
-      mes: data.mes ? Number(data.mes) : undefined,
-      año: data.año ? Number(data.año) : undefined,
-      fecha: data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString()
-    });
-    const id = await db.pagos.add(pagoInstance);
+    const gimnasioId = await getActiveGimnasioId();
+    const payload = mapToDb(data, gimnasioId);
+
+    const { data: inserted, error } = await supabase
+      .from('pagos')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) throw error;
+
     if (data.tipo === 'material' && data.concepto) {
       saveStoredCategoria('material', data.concepto.trim(), DEFAULT_CATEGORIAS_MATERIAL);
     } else if (data.tipo === 'licencia' && data.concepto) {
       saveStoredCategoria('licencias', data.concepto.trim(), DEFAULT_CATEGORIAS_LICENCIAS);
     }
-    return id;
+
+    return mapFromDb(inserted);
   },
 
   /**
-   * Registra una venta múltiple de productos de equipamiento a un alumno.
-   * Crea una transacción atómica para añadir cada artículo a la tabla de pagos.
+   * Registra una venta múltiple insertando varios registros en un solo lote
    */
   async registrarVentaMultiple({ alumnoId, items = [], fecha = new Date().toISOString(), estado = 'pendiente' }) {
     if (!alumnoId) throw new Error('Se requiere el ID del alumno.');
     if (!items || !items.length) throw new Error('Debe incluir al menos un producto en la venta.');
 
+    const gimnasioId = await getActiveGimnasioId();
     const fechaIso = fecha ? new Date(fecha).toISOString() : new Date().toISOString();
-    const pagosNuevos = items.map(item => {
+
+    const rowsToInsert = items.map(item => {
       const cantidad = Math.max(1, Number(item.cantidad) || 1);
       const precioUnitario = Number(item.precio) || 0;
       const totalLinea = Number((precioUnitario * cantidad).toFixed(2));
@@ -74,8 +147,8 @@ export const pagoService = {
         ? `${baseName}${variantStr} (x${cantidad})` 
         : `${baseName}${variantStr}`;
 
-      return new Pago({
-        alumnoId: Number(alumnoId),
+      return mapToDb({
+        alumnoId,
         tipo: 'material',
         concepto,
         importe: totalLinea,
@@ -85,54 +158,79 @@ export const pagoService = {
         estadoPedido: item.estadoPedido || 'sin_pedir',
         color: item.selectedColor || '',
         talla: item.selectedTalla || '',
-        productoId: item.productoId ? Number(item.productoId) : null
-      });
+        productoId: item.productoId || null
+      }, gimnasioId);
     });
 
-    return db.transaction('rw', db.pagos, async () => {
-      const ids = [];
-      for (const p of pagosNuevos) {
-        const id = await db.pagos.add(p);
-        ids.push(id);
-      }
-      return ids;
-    });
+    const { data: insertedRows, error } = await supabase
+      .from('pagos')
+      .insert(rowsToInsert)
+      .select();
+
+    if (error) throw error;
+    return (insertedRows || []).map(mapFromDb);
   },
 
   /**
-   * Cambia el estado logístico del pedido ('sin_pedir' | 'pedido')
+   * Cambia el estado logístico del pedido ('sin_pedir' | 'pedido' | 'recibido' | 'entregado')
    */
   async cambiarEstadoPedido(id, nuevoEstadoPedido) {
-    return db.pagos.update(Number(id), { estadoPedido: nuevoEstadoPedido });
+    const { data, error } = await supabase
+      .from('pagos')
+      .update({ estado_pedido: nuevoEstadoPedido })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapFromDb(data);
   },
 
   /**
    * Marca un pago como 'pagado'
    */
   async marcarPagado(id) {
-    return db.pagos.update(Number(id), { estado: 'pagado' });
+    const { data, error } = await supabase
+      .from('pagos')
+      .update({ estado: 'pagado' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapFromDb(data);
   },
 
   /**
    * Revierte un pago a 'pendiente'
    */
   async revertirPago(id) {
-    return db.pagos.update(Number(id), { estado: 'pendiente' });
+    const { data, error } = await supabase
+      .from('pagos')
+      .update({ estado: 'pendiente' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapFromDb(data);
   },
 
   /**
    * Elimina un registro de pago
    */
   async delete(id) {
-    return db.pagos.delete(Number(id));
+    const { error } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
   },
 
-  /**
-   * Filtra pagos pendientes y pagados para listados (exámenes, material)
-   */
   separarPendientesYPagados(pagos = [], alumnosMap = {}, search = '') {
     if (!pagos) return { pendientes: [], pagados: [] };
-
     const term = search.toLowerCase().trim();
     let filtrados = pagos;
 
@@ -156,17 +254,12 @@ export const pagoService = {
     return { pendientes, pagados };
   },
 
-  /**
-   * Calcula el estado de cobros de cuotas para un mes y año concretos
-   */
   calcularEstadoCuotasMes(alumnos = [], pagos = [], mes, año, search = '') {
     if (!alumnos || !pagos) return { pendientes: [], pagados: [] };
-
     const mesNum = Number(mes);
     const añoNum = Number(año);
     const term = search.toLowerCase().trim();
 
-    // Pagos de cuota del mes correspondiente (soporta p.mes/p.año o fallback a p.fecha)
     const pagosCuotaMes = pagos.filter(p => {
       if (p.tipo !== 'cuota') return false;
       const pMes = p.mes ? Number(p.mes) : (p.fecha ? new Date(p.fecha).getMonth() + 1 : null);
@@ -174,8 +267,7 @@ export const pagoService = {
       return pMes === mesNum && pAño === añoNum;
     });
 
-    const alumnosPagadosIds = new Set(pagosCuotaMes.map(p => Number(p.alumnoId)));
-
+    const alumnosPagadosIds = new Set(pagosCuotaMes.map(p => p.alumnoId));
     const pendientes = [];
     const pagados = [];
 
@@ -193,14 +285,8 @@ export const pagoService = {
     return { pendientes, pagados };
   },
 
-  /**
-   * Agrupa pagos por mes y año en orden cronológico descendente
-   * @param {Array} pagos
-   * @returns {Array<{ key: string, mesNombre: string, año: number, mes: number, totalImporte: number, totalItems: number, items: Array }>}
-   */
   agruparPagosPorMes(pagos = []) {
     if (!pagos || !pagos.length) return [];
-
     const gruposMap = {};
 
     pagos.forEach(p => {
@@ -242,10 +328,7 @@ export const pagoService = {
       gruposMap[key].totalItems += 1;
     });
 
-    // Ordenar de más reciente a más antiguo
     const gruposOrdenados = Object.values(gruposMap).sort((a, b) => b.key.localeCompare(a.key));
-
-    // Dentro de cada mes, ordenar los pagos por fecha descendente
     gruposOrdenados.forEach(grupo => {
       grupo.items.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     });
@@ -253,4 +336,3 @@ export const pagoService = {
     return gruposOrdenados;
   }
 };
-
