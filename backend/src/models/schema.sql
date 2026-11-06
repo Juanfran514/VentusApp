@@ -12,12 +12,20 @@ CREATE TABLE IF NOT EXISTS gimnasios (
     telefono VARCHAR(50),
     plan VARCHAR(50) DEFAULT 'pro',
     estado_suscripcion VARCHAR(30) DEFAULT 'trialing' CHECK (estado_suscripcion IN ('trialing', 'active', 'past_due', 'canceled')),
+    logo_url TEXT,
+    color_primario VARCHAR(30) DEFAULT '#22c55e',
+    color_secundario VARCHAR(30) DEFAULT '#16a34a',
     stripe_customer_id VARCHAR(100),
     stripe_subscription_id VARCHAR(100),
     fecha_fin_periodo TIMESTAMPTZ,
     fecha_creacion TIMESTAMPTZ DEFAULT NOW(),
     fecha_actualizacion TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migración para instancias existentes:
+-- ALTER TABLE gimnasios ADD COLUMN IF NOT EXISTS logo_url TEXT;
+-- ALTER TABLE gimnasios ADD COLUMN IF NOT EXISTS color_primario VARCHAR(30) DEFAULT '#22c55e';
+-- ALTER TABLE gimnasios ADD COLUMN IF NOT EXISTS color_secundario VARCHAR(30) DEFAULT '#16a34a';
 
 -- 2. Usuarios del Gimnasio (Entrenadores, Recepción, Administradores)
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -95,7 +103,21 @@ CREATE TABLE IF NOT EXISTS gastos (
     tipo VARCHAR(20) DEFAULT 'variable' CHECK (tipo IN ('variable', 'fijo')),
     mes INT,
     año INT,
+    gasto_fijo_id UUID,
+    factura TEXT,
     factura_url TEXT
+);
+
+-- 6.1. Plantillas de Gastos Fijos Recurrentes
+CREATE TABLE IF NOT EXISTS gastos_fijos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    gimnasio_id UUID NOT NULL REFERENCES gimnasios(id) ON DELETE CASCADE,
+    concepto VARCHAR(200) NOT NULL,
+    categoria VARCHAR(100) NOT NULL,
+    importe NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    dia_mes INT DEFAULT 1,
+    activo BOOLEAN DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 7. Catálogo de Productos / Equipamiento
@@ -121,5 +143,6 @@ CREATE INDEX IF NOT EXISTS idx_alumnos_gimnasio ON alumnos(gimnasio_id);
 CREATE INDEX IF NOT EXISTS idx_grupos_gimnasio ON grupos(gimnasio_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_gimnasio_mes ON pagos(gimnasio_id, mes, año);
 CREATE INDEX IF NOT EXISTS idx_gastos_gimnasio_mes ON gastos(gimnasio_id, mes, año);
+CREATE INDEX IF NOT EXISTS idx_gastos_fijos_gimnasio ON gastos_fijos(gimnasio_id);
 CREATE INDEX IF NOT EXISTS idx_productos_gimnasio ON productos(gimnasio_id);
 

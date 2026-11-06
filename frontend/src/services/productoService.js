@@ -1,4 +1,5 @@
 import { supabase, getActiveGimnasioId } from '../supabase';
+import { dataEvents } from './dataEvents';
 
 const mapFromDb = (row) => {
   if (!row) return null;
@@ -112,6 +113,7 @@ export const productoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('productos', inserted);
     return mapFromDb(inserted);
   },
 
@@ -128,6 +130,7 @@ export const productoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('productos', updated);
     return mapFromDb(updated);
   },
 
@@ -151,6 +154,7 @@ export const productoService = {
       .eq('id', id);
 
     if (error) throw error;
+    dataEvents.emit('productos', { id });
     return true;
   }
 };

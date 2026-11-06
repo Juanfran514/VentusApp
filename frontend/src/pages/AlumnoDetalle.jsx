@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { alumnoService } from '../services/alumnoService';
 import { pagoService } from '../services/pagoService';
 import { grupoService } from '../services/grupoService';
@@ -26,7 +26,7 @@ import './Alumnos.css';
 
 const AlumnoDetalle = () => {
   const { id } = useParams();
-  const alumnoId = Number(id);
+  const alumnoId = id;
   const confirm = useConfirm();
   const { toast } = useToast();
 
@@ -43,9 +43,9 @@ const AlumnoDetalle = () => {
   const currentDate = useMemo(() => new Date(), []);
 
   // Consultas reactivas desacopladas mediante capa de servicios
-  const alumno = useLiveQuery(() => alumnoService.getById(alumnoId), [alumnoId]);
-  const todosPagos = useLiveQuery(() => pagoService.getAll(), []);
-  const gruposRaw = useLiveQuery(() => grupoService.getAll(), []);
+  const alumno = useDataQuery(() => alumnoService.getById(alumnoId), [alumnoId], ['alumnos']);
+  const todosPagos = useDataQuery(() => pagoService.getAll(), [], ['pagos']);
+  const gruposRaw = useDataQuery(() => grupoService.getAll(), [], ['grupos']);
   const grupos = useMemo(() => gruposRaw || [], [gruposRaw]);
 
   // Materiales sugeridos para autocompletado

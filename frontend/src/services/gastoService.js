@@ -1,5 +1,6 @@
 import { supabase, getActiveGimnasioId } from '../supabase';
 import { saveStoredCategoria } from '../utils/categorias';
+import { dataEvents } from './dataEvents';
 
 const mapGastoFromDb = (row) => {
   if (!row) return null;
@@ -93,6 +94,7 @@ export const gastoService = {
       saveStoredCategoria('gastos', catTrimmed, []);
     }
 
+    dataEvents.emit('gastos_fijos', inserted);
     return mapGastoFijoFromDb(inserted);
   },
 
@@ -121,6 +123,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos_fijos', updated);
     return mapGastoFijoFromDb(updated);
   },
 
@@ -134,6 +137,7 @@ export const gastoService = {
       .eq('id', id);
 
     if (error) throw error;
+    dataEvents.emit('gastos_fijos', { id });
     return true;
   },
 
@@ -231,6 +235,7 @@ export const gastoService = {
         .update(updateData)
         .eq('id', existente.id);
 
+      dataEvents.emit('gastos', { id: existente.id });
       return existente.id;
     }
 
@@ -254,6 +259,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos', inserted);
     return inserted.id;
   },
 
@@ -273,6 +279,7 @@ export const gastoService = {
       .eq('año', añoNum);
 
     if (error) throw error;
+    dataEvents.emit('gastos', { gastoFijoId });
     return true;
   },
 
@@ -307,6 +314,7 @@ export const gastoService = {
         .from('gastos')
         .update(updates)
         .eq('id', existente.id);
+      dataEvents.emit('gastos', { id: existente.id });
       return existente.id;
     }
 
@@ -330,6 +338,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos', inserted);
     return inserted.id;
   },
 
@@ -371,6 +380,7 @@ export const gastoService = {
       }
       saveStoredCategoria('gastos', catTrimmed, []);
     }
+    dataEvents.emit('gastos', inserted);
     return mapGastoFromDb(inserted);
   },
 
@@ -406,6 +416,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos', updated);
     return mapGastoFromDb(updated);
   },
 
@@ -421,6 +432,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos', data);
     return mapGastoFromDb(data);
   },
 
@@ -436,6 +448,7 @@ export const gastoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('gastos', data);
     return mapGastoFromDb(data);
   },
 
@@ -449,6 +462,7 @@ export const gastoService = {
       .eq('id', id);
 
     if (error) throw error;
+    dataEvents.emit('gastos', { id });
     return true;
   },
 

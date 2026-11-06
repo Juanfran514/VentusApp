@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { alumnoService } from '../services/alumnoService';
 import { grupoService } from '../services/grupoService';
 import Modal from '../components/ui/Modal';
@@ -19,7 +19,7 @@ const Alumnos = () => {
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const gruposDisponiblesRaw = useLiveQuery(() => grupoService.getAll());
+  const gruposDisponiblesRaw = useDataQuery(() => grupoService.getAll(), [], ['grupos']);
   const gruposDisponibles = useMemo(() => gruposDisponiblesRaw || [], [gruposDisponiblesRaw]);
 
   const gruposMap = useMemo(() => {
@@ -29,7 +29,7 @@ const Alumnos = () => {
     }, {});
   }, [gruposDisponibles]);
 
-  const alumnos = useLiveQuery(
+  const alumnos = useDataQuery(
     async () => {
       const results = await alumnoService.getAll(search);
       const allGroups = await grupoService.getAll();
@@ -48,7 +48,8 @@ const Alumnos = () => {
 
       return results;
     },
-    [search]
+    [search],
+    ['alumnos', 'grupos']
   );
 
   const openNewModal = () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../../hooks/useDataQuery';
 import { productoService } from '../../services';
 import { getTipoPagoConfig } from '../../constants/tiposPago';
 import { MESES_NOMBRES } from '../../constants/fechas';
@@ -342,7 +342,7 @@ const ModalPagoAlumno = ({
   mesesNombres = MESES_NOMBRES
 }) => {
   const config = getTipoPagoConfig(tipo);
-  const productos = useLiveQuery(() => productoService.getAll(), []) || [];
+  const productos = useDataQuery(() => productoService.getAll(), [], ['productos']) || [];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={config.modalTitle}>

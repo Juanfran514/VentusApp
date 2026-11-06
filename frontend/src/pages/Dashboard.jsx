@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import {
   alumnoService,
   pagoService,
@@ -17,11 +17,11 @@ import { FileDown } from 'lucide-react';
 import './Dashboard.css';
 
 const Dashboard = () => {
-  const alumnosRaw = useLiveQuery(() => alumnoService.getAll(), []);
-  const pagosRaw = useLiveQuery(() => pagoService.getAll(), []);
-  const gastosRaw = useLiveQuery(() => gastoService.getAll(), []);
-  const gruposRaw = useLiveQuery(() => grupoService.getAll(), []);
-  const gastosFijosRaw = useLiveQuery(() => gastoService.getAllFijos(), []);
+  const alumnosRaw = useDataQuery(() => alumnoService.getAll(), [], ['alumnos']);
+  const pagosRaw = useDataQuery(() => pagoService.getAll(), [], ['pagos']);
+  const gastosRaw = useDataQuery(() => gastoService.getAll(), [], ['gastos']);
+  const gruposRaw = useDataQuery(() => grupoService.getAll(), [], ['grupos']);
+  const gastosFijosRaw = useDataQuery(() => gastoService.getAllFijos(), [], ['gastos_fijos']);
 
   const alumnos = useMemo(() => alumnosRaw || [], [alumnosRaw]);
   const pagos = useMemo(() => pagosRaw || [], [pagosRaw]);

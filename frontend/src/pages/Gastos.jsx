@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { gastoService } from '../services/gastoService';
 import { getNombreMes, generarRangoAños } from '../constants/fechas';
 import { getStoredCategorias, mergeCategorias } from '../utils/categorias';
@@ -75,8 +75,8 @@ const Gastos = () => {
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const gastosRaw = useLiveQuery(() => gastoService.getAll(), []);
-  const gastosFijosRaw = useLiveQuery(() => gastoService.getAllFijos(), []);
+  const gastosRaw = useDataQuery(() => gastoService.getAll(), [], ['gastos']);
+  const gastosFijosRaw = useDataQuery(() => gastoService.getAllFijos(), [], ['gastos_fijos']);
 
   const gastos = useMemo(() => gastosRaw || [], [gastosRaw]);
   const gastosFijos = useMemo(() => gastosFijosRaw || [], [gastosFijosRaw]);

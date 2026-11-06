@@ -1,6 +1,7 @@
 import { supabase, getActiveGimnasioId } from '../supabase';
 import { normalizarCinturon } from '../utils/cinturones';
 import { getNombreCompleto } from '../utils/formatters';
+import { dataEvents } from './dataEvents';
 
 // Mapeador de Base de Datos (snake_case) -> Modelo Frontend (camelCase)
 const mapFromDb = (row) => {
@@ -120,6 +121,7 @@ export const alumnoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('alumnos', inserted);
     return mapFromDb(inserted);
   },
 
@@ -137,6 +139,7 @@ export const alumnoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('alumnos', updated);
     return mapFromDb(updated);
   },
 
@@ -150,6 +153,7 @@ export const alumnoService = {
       .eq('id', id);
 
     if (error) throw error;
+    dataEvents.emit('alumnos', { id });
     return true;
   },
 

@@ -1,4 +1,4 @@
-import { db } from '../db/db';
+import { backupService } from '../services/backupService';
 
 /**
  * Solicita silenciosamente almacenamiento persistente al navegador
@@ -17,52 +17,16 @@ export const solicitarPersistenciaAutomatica = async () => {
 };
 
 /**
- * Exporta todos los datos de Dexie y localStorage como archivo .json
+ * Descarga o comparte un archivo JSON en el navegador (Web Share API para iPad / descarga directa)
  */
-export const exportarCopiaSeguridad = async () => {
-  const alumnos = await db.alumnos.toArray();
-  const grupos = await db.grupos.toArray();
-  const pagos = await db.pagos.toArray();
-  const gastos = await db.gastos.toArray();
-  const gastosFijos = db.gastosFijos ? await db.gastosFijos.toArray() : [];
-  const productos = db.productos ? await db.productos.toArray() : [];
-
-  const categoriasGastos = localStorage.getItem('ventus_cat_gastos');
-  const categoriasGastosVariables = localStorage.getItem('ventus_cat_gastos_variables');
-  const categoriasGastosFijos = localStorage.getItem('ventus_cat_gastos_fijos');
-  const categoriasGrupos = localStorage.getItem('ventus_cat_grupos');
-  const categoriasMaterial = localStorage.getItem('ventus_cat_material');
-  const categoriasLicencias = localStorage.getItem('ventus_cat_licencias');
-
-  const backupData = {
-    app: 'VentusApp',
-    version: 4,
-    fecha: new Date().toISOString(),
-    data: {
-      alumnos,
-      grupos,
-      pagos,
-      gastos,
-      gastosFijos,
-      productos,
-      categorias: {
-        gastos: categoriasGastos ? JSON.parse(categoriasGastos) : [],
-        gastos_variables: categoriasGastosVariables ? JSON.parse(categoriasGastosVariables) : [],
-        gastos_fijos: categoriasGastosFijos ? JSON.parse(categoriasGastosFijos) : [],
-        grupos: categoriasGrupos ? JSON.parse(categoriasGrupos) : [],
-        material: categoriasMaterial ? JSON.parse(categoriasMaterial) : [],
-        licencias: categoriasLicencias ? JSON.parse(categoriasLicencias) : []
-      }
-    }
-  };
-
-  const jsonStr = JSON.stringify(backupData, null, 2);
+export const descargarOCompartirArchivo = async (jsonData, nombreArchivoBase = 'copia_seguridad_ventus') => {
+  const jsonStr = JSON.stringify(jsonData, null, 2);
   const datePart = new Date().toISOString().split('T')[0];
-  const filename = `copia_seguridad_ventus_${datePart}.json`;
+  const filename = `${nombreArchivoBase}_${datePart}.json`;
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const file = new File([blob], filename, { type: 'application/json' });
 
-  // Si iPadOS soporta Web Share con archivos (AirDrop, Guardar en Archivos...)
+  // Si iPadOS / iOS / Android soporta Web Share con archivos (AirDrop, Guardar en Archivos...)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
@@ -70,7 +34,7 @@ export const exportarCopiaSeguridad = async () => {
         title: filename,
         text: 'Copia de seguridad de Ventus App'
       });
-      return { exito: true, metodo: 'share' };
+      return { exito: true, metodo: 'share', filename };
     } catch (shareErr) {
       if (shareErr.name === 'AbortError') {
         return { exito: false, cancelado: true };
@@ -78,7 +42,7 @@ export const exportarCopiaSeguridad = async () => {
     }
   }
 
-  // Descarga directa habitual (en iPad va a la app Archivos -> Descargas)
+  // Descarga directa habitual en navegador
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -92,73 +56,16 @@ export const exportarCopiaSeguridad = async () => {
 };
 
 /**
- * Restaura los datos desde una estructura JSON válida
+ * Exporta todos los datos del club/gimnasio desde Supabase y los guarda como archivo .json
+ */
+export const exportarCopiaSeguridad = async () => {
+  const backupData = await backupService.exportarDatos();
+  return await descargarOCompartirArchivo(backupData);
+};
+
+/**
+ * Restaura los datos en Supabase desde una estructura JSON válida (soporta versiones v1 a v5)
  */
 export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') => {
-  if (!backupData?.data) {
-    throw new Error('El archivo no contiene datos válidos de VentusApp.');
-  }
-
-  const { alumnos = [], grupos = [], pagos = [], gastos = [], gastosFijos = [], productos = [], categorias = {} } = backupData.data;
-
-  const stores = [db.alumnos, db.grupos, db.pagos, db.gastos];
-  if (db.gastosFijos) stores.push(db.gastosFijos);
-  if (db.productos) stores.push(db.productos);
-
-  if (modo === 'reemplazar') {
-    await db.transaction('rw', stores, async () => {
-      await db.alumnos.clear();
-      await db.grupos.clear();
-      await db.pagos.clear();
-      await db.gastos.clear();
-      if (db.gastosFijos) await db.gastosFijos.clear();
-      if (db.productos) await db.productos.clear();
-
-      if (alumnos.length) await db.alumnos.bulkAdd(alumnos);
-      if (grupos.length) await db.grupos.bulkAdd(grupos);
-      if (pagos.length) await db.pagos.bulkAdd(pagos);
-      if (gastos.length) await db.gastos.bulkAdd(gastos);
-      if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkAdd(gastosFijos);
-      if (db.productos && productos.length) await db.productos.bulkAdd(productos);
-    });
-  } else {
-    // Modo fusionar
-    await db.transaction('rw', stores, async () => {
-      if (alumnos.length) await db.alumnos.bulkPut(alumnos);
-      if (grupos.length) await db.grupos.bulkPut(grupos);
-      if (pagos.length) await db.pagos.bulkPut(pagos);
-      if (gastos.length) await db.gastos.bulkPut(gastos);
-      if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkPut(gastosFijos);
-      if (db.productos && productos.length) await db.productos.bulkPut(productos);
-    });
-  }
-
-  // Restaurar categorías en localStorage si vienen en la copia
-  if (categorias?.gastos && Array.isArray(categorias.gastos)) {
-    localStorage.setItem('ventus_cat_gastos', JSON.stringify(categorias.gastos));
-  }
-  if (categorias?.gastos_variables && Array.isArray(categorias.gastos_variables)) {
-    localStorage.setItem('ventus_cat_gastos_variables', JSON.stringify(categorias.gastos_variables));
-  }
-  if (categorias?.gastos_fijos && Array.isArray(categorias.gastos_fijos)) {
-    localStorage.setItem('ventus_cat_gastos_fijos', JSON.stringify(categorias.gastos_fijos));
-  }
-  if (categorias?.grupos && Array.isArray(categorias.grupos)) {
-    localStorage.setItem('ventus_cat_grupos', JSON.stringify(categorias.grupos));
-  }
-  if (categorias?.material && Array.isArray(categorias.material)) {
-    localStorage.setItem('ventus_cat_material', JSON.stringify(categorias.material));
-  }
-  if (categorias?.licencias && Array.isArray(categorias.licencias)) {
-    localStorage.setItem('ventus_cat_licencias', JSON.stringify(categorias.licencias));
-  }
-
-  return {
-    alumnos: alumnos.length,
-    grupos: grupos.length,
-    pagos: pagos.length,
-    gastos: gastos.length,
-    gastosFijos: gastosFijos.length,
-    productos: productos.length
-  };
+  return await backupService.restaurarDatos(backupData, modo);
 };

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { grupoService } from '../services/grupoService';
 import { alumnoService } from '../services/alumnoService';
 import { useSortableList } from '../hooks/useSortableList';
@@ -39,8 +39,8 @@ const Grupos = () => {
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const alumnosTotalesRaw = useLiveQuery(() => alumnoService.getAll());
-  const gruposRawQuery = useLiveQuery(() => grupoService.getAll());
+  const alumnosTotalesRaw = useDataQuery(() => alumnoService.getAll(), [], ['alumnos']);
+  const gruposRawQuery = useDataQuery(() => grupoService.getAll(), [], ['grupos']);
 
   const alumnosTotales = useMemo(() => alumnosTotalesRaw || [], [alumnosTotalesRaw]);
   const gruposRaw = useMemo(() => gruposRawQuery || [], [gruposRawQuery]);

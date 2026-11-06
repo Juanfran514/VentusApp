@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../../hooks/useDataQuery';
 import { alumnoService, pagoService } from '../../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../../utils/formatters';
 import { getStoredCategorias, saveStoredCategoria, mergeCategorias } from '../../utils/categorias';
@@ -53,8 +53,8 @@ const GestionCargosTemplate = ({
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const alumnos = useLiveQuery(() => alumnoService.getAll(), []);
-  const registros = useLiveQuery(() => pagoService.getByTipo(tipo), [tipo]);
+  const alumnos = useDataQuery(() => alumnoService.getAll(), [], ['alumnos']);
+  const registros = useDataQuery(() => pagoService.getByTipo(tipo), [tipo], ['pagos']);
 
   const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 

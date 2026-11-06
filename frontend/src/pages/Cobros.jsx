@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { alumnoService, pagoService } from '../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import { exportarMesAPdf } from '../utils/pdfExport';
@@ -34,8 +34,8 @@ const Cobros = () => {
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const alumnos = useLiveQuery(() => alumnoService.getActivos(), []);
-  const pagos = useLiveQuery(() => pagoService.getAll(), []);
+  const alumnos = useDataQuery(() => alumnoService.getActivos(), [], ['alumnos']);
+  const pagos = useDataQuery(() => pagoService.getAll(), [], ['pagos']);
 
   const alumnosMap = useMemo(() => alumnoService.buildAlumnosMap(alumnos), [alumnos]);
 

@@ -19,13 +19,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Obtiene el usuario autenticado actual
+ * Obtiene el usuario autenticado actual desde la sesión local
  */
 export const getCurrentUser = async () => {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
-    return user;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session?.user) return null;
+    return session.user;
   } catch (err) {
     console.error('Error al obtener usuario actual:', err);
     return null;
@@ -34,13 +34,37 @@ export const getCurrentUser = async () => {
 
 /**
  * Obtiene el ID del gimnasio del usuario autenticado.
- * Si el usuario aún no está logueado en modo desarrollo/demo, retorna un UUID por defecto.
+ * Usa caché en localStorage para máximo rendimiento y evita peticiones redundantes.
  */
 export const getActiveGimnasioId = async () => {
+  const cached = localStorage.getItem('ventus_active_gimnasio_id');
+  if (cached) return cached;
+
   const user = await getCurrentUser();
   if (user) {
-    return user.user_metadata?.gimnasio_id || user.id;
+    // Si viene en los metadatos de usuario
+    if (user.user_metadata?.gimnasio_id) {
+      localStorage.setItem('ventus_active_gimnasio_id', user.user_metadata.gimnasio_id);
+      return user.user_metadata.gimnasio_id;
+    }
+
+    // Consultar tabla usuarios
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('gimnasio_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!error && data?.gimnasio_id) {
+        localStorage.setItem('ventus_active_gimnasio_id', data.gimnasio_id);
+        return data.gimnasio_id;
+      }
+    } catch (e) {
+      console.warn('No se pudo obtener gimnasio_id de la tabla usuarios:', e);
+    }
   }
+
   // Fallback para desarrollo sin auth obligatoria inicial
   let localDevId = localStorage.getItem('ventus_dev_gimnasio_id');
   if (!localDevId) {
@@ -49,4 +73,3 @@ export const getActiveGimnasioId = async () => {
   }
   return localDevId;
 };
-

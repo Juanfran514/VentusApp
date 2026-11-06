@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useDataQuery } from '../hooks/useDataQuery';
 import { alumnoService, pagoService, productoService } from '../services';
 import { formatCurrency, formatDate, getNombreCompleto } from '../utils/formatters';
 import { exportarMesAPdf } from '../utils/pdfExport';
@@ -59,9 +59,9 @@ const Equipamiento = () => {
   const confirm = useConfirm();
   const { toast } = useToast();
 
-  const alumnosRaw = useLiveQuery(() => alumnoService.getAll(), []);
-  const productosRaw = useLiveQuery(() => productoService.getAll(), []);
-  const pagosMaterialRaw = useLiveQuery(() => pagoService.getByTipo('material'), []);
+  const alumnosRaw = useDataQuery(() => alumnoService.getAll(), [], ['alumnos']);
+  const productosRaw = useDataQuery(() => productoService.getAll(), [], ['productos']);
+  const pagosMaterialRaw = useDataQuery(() => pagoService.getByTipo('material'), [], ['pagos']);
 
   const alumnos = useMemo(() => alumnosRaw || [], [alumnosRaw]);
   const productos = useMemo(() => productosRaw || [], [productosRaw]);

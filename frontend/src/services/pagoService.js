@@ -2,6 +2,7 @@ import { supabase, getActiveGimnasioId } from '../supabase';
 import { getNombreCompleto } from '../utils/formatters';
 import { saveStoredCategoria, DEFAULT_CATEGORIAS_MATERIAL, DEFAULT_CATEGORIAS_LICENCIAS } from '../utils/categorias';
 import { MESES_NOMBRES } from '../constants/fechas';
+import { dataEvents } from './dataEvents';
 
 const mapFromDb = (row) => {
   if (!row) return null;
@@ -117,6 +118,7 @@ export const pagoService = {
       saveStoredCategoria('licencias', data.concepto.trim(), DEFAULT_CATEGORIAS_LICENCIAS);
     }
 
+    dataEvents.emit('pagos', inserted);
     return mapFromDb(inserted);
   },
 
@@ -168,6 +170,7 @@ export const pagoService = {
       .select();
 
     if (error) throw error;
+    dataEvents.emit('pagos', insertedRows);
     return (insertedRows || []).map(mapFromDb);
   },
 
@@ -183,6 +186,7 @@ export const pagoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('pagos', data);
     return mapFromDb(data);
   },
 
@@ -198,6 +202,7 @@ export const pagoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('pagos', data);
     return mapFromDb(data);
   },
 
@@ -213,6 +218,7 @@ export const pagoService = {
       .single();
 
     if (error) throw error;
+    dataEvents.emit('pagos', data);
     return mapFromDb(data);
   },
 
@@ -226,6 +232,7 @@ export const pagoService = {
       .eq('id', id);
 
     if (error) throw error;
+    dataEvents.emit('pagos', { id });
     return true;
   },
 
