@@ -138,22 +138,220 @@ export const gastoService = {
   },
 
   /**
-   * Crea un gasto variable puntual
+   * Calcula el estado de los gastos fijos para un mes y año dados.
+   * Si no se ha marcado como pagado este mes, aparece como 'pendiente'.
    */
-  async createGastoVariable(data) {
+  calcularEstadoFijosMes(gastosFijos = [], gastos = [], mes, año) {
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+    const fijosActivos = (gastosFijos || []).filter(gf => gf.activo !== false);
+
+    const items = fijosActivos.map(gf => {
+      const record = (gastos || []).find(g => 
+        g.tipo === 'fijo' && 
+        String(g.gastoFijoId) === String(gf.id) &&
+        Number(g.mes) === mesNum &&
+        Number(g.año) === añoNum
+      );
+
+      if (record) {
+        return {
+          id: gf.id,
+          gastoFijo: gf,
+          concepto: record.concepto || gf.concepto,
+          categoria: record.categoria || gf.categoria,
+          importe: Number(record.importe),
+          fechaPago: record.fecha,
+          pagado: true,
+          gastoRegistroId: record.id,
+          factura: record.factura || null
+        };
+      }
+
+      return {
+        id: gf.id,
+        gastoFijo: gf,
+        concepto: gf.concepto,
+        categoria: gf.categoria,
+        importe: Number(gf.importe),
+        fechaPago: null,
+        pagado: false,
+        gastoRegistroId: null,
+        factura: null
+      };
+    });
+
+    const pagados = items.filter(i => i.pagado);
+    const pendientes = items.filter(i => !i.pagado);
+
+    const totalPagado = pagados.reduce((sum, i) => sum + i.importe, 0);
+    const totalPendiente = pendientes.reduce((sum, i) => sum + i.importe, 0);
+
+    return {
+      items,
+      pagados,
+      pendientes,
+      totalPagado,
+      totalPendiente,
+      countPagados: pagados.length,
+      countPendientes: pendientes.length
+    };
+  },
+
+  /**
+   * Marca un gasto fijo como pagado (tildado) en el mes/año indicado.
+   */
+  async tildarGastoFijo({ gastoFijo, mes, año, importe, fecha, factura = null }) {
+    const gimnasioId = await getActiveGimnasioId();
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+    const fechaObj = fecha ? new Date(fecha) : new Date();
+
+    // Comprobar si ya existe
+    const { data: existentes } = await supabase
+      .from('gastos')
+      .select('id')
+      .eq('tipo', 'fijo')
+      .eq('gasto_fijo_id', gastoFijo.id)
+      .eq('mes', mesNum)
+      .eq('año', añoNum);
+
+    const existente = existentes?.[0];
+    const importeFinal = Number(importe !== undefined && importe !== '' ? importe : gastoFijo.importe) || 0;
+
+    if (existente) {
+      const updateData = {
+        importe: importeFinal,
+        fecha: fechaObj.toISOString()
+      };
+      if (factura !== undefined) updateData.factura = factura;
+
+      await supabase
+        .from('gastos')
+        .update(updateData)
+        .eq('id', existente.id);
+
+      return existente.id;
+    }
+
+    const payload = {
+      gimnasio_id: gimnasioId,
+      concepto: gastoFijo.concepto,
+      categoria: gastoFijo.categoria,
+      importe: importeFinal,
+      fecha: fechaObj.toISOString(),
+      tipo: 'fijo',
+      mes: mesNum,
+      año: añoNum,
+      gasto_fijo_id: gastoFijo.id,
+      factura: factura || null
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('gastos')
+      .insert([payload])
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return inserted.id;
+  },
+
+  /**
+   * Desmarca un gasto fijo (destildar), eliminando el registro de pago del mes
+   */
+  async destildarGastoFijo({ gastoFijoId, mes, año }) {
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+
+    const { error } = await supabase
+      .from('gastos')
+      .delete()
+      .eq('tipo', 'fijo')
+      .eq('gasto_fijo_id', gastoFijoId)
+      .eq('mes', mesNum)
+      .eq('año', añoNum);
+
+    if (error) throw error;
+    return true;
+  },
+
+  /**
+   * Modifica el importe, fecha o factura de un gasto fijo para un mes específico
+   */
+  async modificarGastoFijoMes({ gastoFijo, mes, año, nuevoImporte, fecha, factura = undefined }) {
+    const gimnasioId = await getActiveGimnasioId();
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+    const importeFinal = Number(nuevoImporte) || 0;
+    const fechaISO = fecha ? new Date(fecha).toISOString() : new Date().toISOString();
+
+    const { data: existentes } = await supabase
+      .from('gastos')
+      .select('id')
+      .eq('tipo', 'fijo')
+      .eq('gasto_fijo_id', gastoFijo.id)
+      .eq('mes', mesNum)
+      .eq('año', añoNum);
+
+    const existente = existentes?.[0];
+
+    const updates = {
+      importe: importeFinal,
+      fecha: fechaISO
+    };
+    if (factura !== undefined) updates.factura = factura;
+
+    if (existente) {
+      await supabase
+        .from('gastos')
+        .update(updates)
+        .eq('id', existente.id);
+      return existente.id;
+    }
+
+    const payload = {
+      gimnasio_id: gimnasioId,
+      concepto: gastoFijo.concepto,
+      categoria: gastoFijo.categoria,
+      importe: importeFinal,
+      fecha: fechaISO,
+      tipo: 'fijo',
+      mes: mesNum,
+      año: añoNum,
+      gasto_fijo_id: gastoFijo.id,
+      factura: factura || null
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('gastos')
+      .insert([payload])
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return inserted.id;
+  },
+
+  /**
+   * Crea un nuevo gasto (variable por defecto)
+   */
+  async create(data) {
     const gimnasioId = await getActiveGimnasioId();
     const catTrimmed = (data.categoria || '').trim();
-    const fechaDate = data.fecha ? new Date(data.fecha) : new Date();
+    const tipo = data.tipo || 'variable';
+    const d = data.fecha ? new Date(data.fecha) : new Date();
 
     const payload = {
       gimnasio_id: gimnasioId,
       concepto: (data.concepto || '').trim(),
       categoria: catTrimmed,
       importe: Number(data.importe) || 0,
-      fecha: data.fecha || new Date().toISOString(),
-      tipo: 'variable',
-      mes: fechaDate.getMonth() + 1,
-      año: fechaDate.getFullYear(),
+      fecha: d.toISOString(),
+      tipo,
+      mes: data.mes ? Number(data.mes) : d.getMonth() + 1,
+      año: data.año ? Number(data.año) : d.getFullYear(),
+      gasto_fijo_id: data.gastoFijoId || null,
       factura: data.factura || null
     };
 
@@ -166,30 +364,35 @@ export const gastoService = {
     if (error) throw error;
 
     if (catTrimmed) {
-      saveStoredCategoria('gastos_variables', catTrimmed, []);
+      if (tipo === 'variable') {
+        saveStoredCategoria('gastos_variables', catTrimmed, []);
+      } else {
+        saveStoredCategoria('gastos_fijos', catTrimmed, []);
+      }
       saveStoredCategoria('gastos', catTrimmed, []);
     }
-
     return mapGastoFromDb(inserted);
   },
 
   /**
-   * Actualiza un gasto variable existente
+   * Actualiza un gasto existente
    */
-  async updateGastoVariable(id, data) {
+  async update(id, data) {
     const updates = {};
     if (data.concepto !== undefined) updates.concepto = (data.concepto || '').trim();
     if (data.categoria !== undefined) {
       updates.categoria = (data.categoria || '').trim();
       if (updates.categoria) {
-        saveStoredCategoria('gastos_variables', updates.categoria, []);
+        if (data.tipo === 'variable') {
+          saveStoredCategoria('gastos_variables', updates.categoria, []);
+        }
         saveStoredCategoria('gastos', updates.categoria, []);
       }
     }
     if (data.importe !== undefined) updates.importe = Number(data.importe) || 0;
     if (data.fecha !== undefined) {
-      updates.fecha = data.fecha;
       const d = new Date(data.fecha);
+      updates.fecha = d.toISOString();
       updates.mes = d.getMonth() + 1;
       updates.año = d.getFullYear();
     }
@@ -207,7 +410,37 @@ export const gastoService = {
   },
 
   /**
-   * Elimina un registro de gasto
+   * Adjunta una factura a un gasto existente
+   */
+  async adjuntarFactura(gastoId, factura) {
+    const { data, error } = await supabase
+      .from('gastos')
+      .update({ factura })
+      .eq('id', gastoId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapGastoFromDb(data);
+  },
+
+  /**
+   * Elimina la factura de un gasto
+   */
+  async eliminarFactura(gastoId) {
+    const { data, error } = await supabase
+      .from('gastos')
+      .update({ factura: null })
+      .eq('id', gastoId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapGastoFromDb(data);
+  },
+
+  /**
+   * Elimina un gasto por ID
    */
   async delete(id) {
     const { error } = await supabase
@@ -219,23 +452,54 @@ export const gastoService = {
     return true;
   },
 
+  /**
+   * Extrae los conceptos habituales de gastos variables
+   */
+  getConceptosVariablesHabituales(gastos = []) {
+    const map = new Map();
+    (gastos || [])
+      .filter(g => g.tipo !== 'fijo')
+      .forEach(g => {
+        const c = (g.concepto || '').trim();
+        if (!c) return;
+        const key = c.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            concepto: c,
+            categoria: g.categoria || '',
+            importe: Number(g.importe) || 0,
+            fechaUltima: g.fecha
+          });
+        }
+      });
+
+    return Array.from(map.values()).sort((a, b) => a.concepto.localeCompare(b.concepto));
+  },
+
+  /**
+   * Agrupa gastos por categoría para gráficos y resúmenes del mes y año seleccionados.
+   */
   agruparPorCategoria(gastos = [], mes, año) {
     if (!gastos || !gastos.length) return [];
     const mesNum = Number(mes);
     const añoNum = Number(año);
 
     const filtrados = gastos.filter(g => {
-      const gMes = g.mes ? Number(g.mes) : new Date(g.fecha).getMonth() + 1;
-      const gAño = g.año ? Number(g.año) : new Date(g.fecha).getFullYear();
-      return gMes === mesNum && gAño === añoNum;
+      if (g.mes && g.año) {
+        return Number(g.mes) === mesNum && Number(g.año) === añoNum;
+      }
+      const d = new Date(g.fecha);
+      return (d.getMonth() + 1) === mesNum && d.getFullYear() === añoNum;
     });
 
-    const catMap = {};
+    const categoryMap = {};
     filtrados.forEach(g => {
       const cat = g.categoria || 'Otros';
-      catMap[cat] = (catMap[cat] || 0) + (Number(g.importe) || 0);
+      categoryMap[cat] = (categoryMap[cat] || 0) + Number(g.importe);
     });
 
-    return Object.entries(catMap).map(([name, value]) => ({ name, value }));
+    return Object.keys(categoryMap)
+      .map(key => ({ name: key, value: categoryMap[key] }))
+      .sort((a, b) => b.value - a.value);
   }
 };

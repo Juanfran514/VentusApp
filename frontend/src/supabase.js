@@ -49,3 +49,4 @@ export const getActiveGimnasioId = async () => {
   }
   return localDevId;
 };
+
