@@ -2,6 +2,19 @@ import { db, Alumno } from '../db/db';
 import { normalizarCinturon } from '../utils/cinturones';
 import { getNombreCompleto } from '../utils/formatters';
 
+const buildMovimientoAlumno = (alumnoId, tipo, fechaIso, alumnoNombre = '') => {
+  const parsed = fechaIso ? new Date(fechaIso) : new Date();
+  const fechaValida = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return {
+    alumnoId: Number(alumnoId),
+    alumnoNombre,
+    tipo,
+    fecha: fechaValida.toISOString(),
+    mes: fechaValida.getMonth() + 1,
+    año: fechaValida.getFullYear()
+  };
+};
+
 export const alumnoService = {
   /**
    * Obtiene todos los alumnos con filtro opcional por nombre/apellidos
@@ -32,14 +45,26 @@ export const alumnoService = {
   },
 
   /**
-   * Crea un nuevo alumno en la base de datos
+   * Crea un nuevo alumno en la base de datos y registra su movimiento de alta
    */
   async create(data) {
     const alumnoInstance = new Alumno({
       ...data,
       cinturon: data.cinturon ? normalizarCinturon(data.cinturon) : ''
     });
-    return db.alumnos.add(alumnoInstance);
+
+    return db.transaction('rw', db.alumnos, db.movimientosAlumnos, async () => {
+      const id = await db.alumnos.add(alumnoInstance);
+      await db.movimientosAlumnos.add(
+        buildMovimientoAlumno(
+          id,
+          'alta',
+          alumnoInstance.fechaAlta,
+          getNombreCompleto(alumnoInstance)
+        )
+      );
+      return id;
+    });
   },
 
   /**
@@ -62,13 +87,59 @@ export const alumnoService = {
   },
 
   /**
-   * Alterna el estado de un alumno entre 'activo' y 'baja'
+   * Alterna el estado de un alumno entre 'activo' y 'baja' y registra el movimiento.
+   * Si ya existe un movimiento opuesto del mismo alumno en el mes actual, lo anula
+   * para evitar sumar +1 alta y -1 baja en el mismo mes.
    */
   async toggleEstado(alumno) {
     if (!alumno?.id) return;
     const nuevoEstado = alumno.estado === 'activo' ? 'baja' : 'activo';
-    await db.alumnos.update(alumno.id, { estado: nuevoEstado });
+    const tipoMovimiento = nuevoEstado === 'activo' ? 'alta' : 'baja';
+    const tipoOpuesto = nuevoEstado === 'activo' ? 'baja' : 'alta';
+
+    const ahora = new Date();
+    const mesActual = ahora.getMonth() + 1;
+    const añoActual = ahora.getFullYear();
+
+    await db.transaction('rw', db.alumnos, db.movimientosAlumnos, async () => {
+      await db.alumnos.update(alumno.id, { estado: nuevoEstado });
+
+      const opuestosMes = await db.movimientosAlumnos
+        .where('alumnoId')
+        .equals(Number(alumno.id))
+        .filter(
+          m =>
+            Number(m.mes) === mesActual &&
+            Number(m.año) === añoActual &&
+            m.tipo === tipoOpuesto
+        )
+        .toArray();
+
+      if (opuestosMes.length > 0) {
+        const ultimoOpuesto = opuestosMes.sort(
+          (a, b) => new Date(b.fecha) - new Date(a.fecha)
+        )[0];
+        await db.movimientosAlumnos.delete(ultimoOpuesto.id);
+      } else {
+        await db.movimientosAlumnos.add(
+          buildMovimientoAlumno(
+            alumno.id,
+            tipoMovimiento,
+            ahora.toISOString(),
+            getNombreCompleto(alumno)
+          )
+        );
+      }
+    });
+
     return nuevoEstado;
+  },
+
+  /**
+   * Obtiene los movimientos de altas y bajas de un año concreto
+   */
+  async getMovimientosByAño(año) {
+    return db.movimientosAlumnos.where('año').equals(Number(año)).toArray();
   },
 
   /**

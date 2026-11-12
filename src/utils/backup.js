@@ -26,6 +26,7 @@ export const exportarCopiaSeguridad = async () => {
   const gastos = await db.gastos.toArray();
   const gastosFijos = db.gastosFijos ? await db.gastosFijos.toArray() : [];
   const productos = db.productos ? await db.productos.toArray() : [];
+  const movimientosAlumnos = db.movimientosAlumnos ? await db.movimientosAlumnos.toArray() : [];
 
   const categoriasGastos = localStorage.getItem('ventus_cat_gastos');
   const categoriasGastosVariables = localStorage.getItem('ventus_cat_gastos_variables');
@@ -36,7 +37,7 @@ export const exportarCopiaSeguridad = async () => {
 
   const backupData = {
     app: 'VentusApp',
-    version: 4,
+    version: 5,
     fecha: new Date().toISOString(),
     data: {
       alumnos,
@@ -45,6 +46,7 @@ export const exportarCopiaSeguridad = async () => {
       gastos,
       gastosFijos,
       productos,
+      movimientosAlumnos,
       categorias: {
         gastos: categoriasGastos ? JSON.parse(categoriasGastos) : [],
         gastos_variables: categoriasGastosVariables ? JSON.parse(categoriasGastosVariables) : [],
@@ -99,11 +101,21 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
     throw new Error('El archivo no contiene datos válidos de VentusApp.');
   }
 
-  const { alumnos = [], grupos = [], pagos = [], gastos = [], gastosFijos = [], productos = [], categorias = {} } = backupData.data;
+  const {
+    alumnos = [],
+    grupos = [],
+    pagos = [],
+    gastos = [],
+    gastosFijos = [],
+    productos = [],
+    movimientosAlumnos = [],
+    categorias = {}
+  } = backupData.data;
 
   const stores = [db.alumnos, db.grupos, db.pagos, db.gastos];
   if (db.gastosFijos) stores.push(db.gastosFijos);
   if (db.productos) stores.push(db.productos);
+  if (db.movimientosAlumnos) stores.push(db.movimientosAlumnos);
 
   if (modo === 'reemplazar') {
     await db.transaction('rw', stores, async () => {
@@ -113,6 +125,7 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
       await db.gastos.clear();
       if (db.gastosFijos) await db.gastosFijos.clear();
       if (db.productos) await db.productos.clear();
+      if (db.movimientosAlumnos) await db.movimientosAlumnos.clear();
 
       if (alumnos.length) await db.alumnos.bulkAdd(alumnos);
       if (grupos.length) await db.grupos.bulkAdd(grupos);
@@ -120,6 +133,9 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
       if (gastos.length) await db.gastos.bulkAdd(gastos);
       if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkAdd(gastosFijos);
       if (db.productos && productos.length) await db.productos.bulkAdd(productos);
+      if (db.movimientosAlumnos && movimientosAlumnos.length) {
+        await db.movimientosAlumnos.bulkAdd(movimientosAlumnos);
+      }
     });
   } else {
     // Modo fusionar
@@ -130,6 +146,9 @@ export const restaurarCopiaSeguridad = async (backupData, modo = 'reemplazar') =
       if (gastos.length) await db.gastos.bulkPut(gastos);
       if (db.gastosFijos && gastosFijos.length) await db.gastosFijos.bulkPut(gastosFijos);
       if (db.productos && productos.length) await db.productos.bulkPut(productos);
+      if (db.movimientosAlumnos && movimientosAlumnos.length) {
+        await db.movimientosAlumnos.bulkPut(movimientosAlumnos);
+      }
     });
   }
 

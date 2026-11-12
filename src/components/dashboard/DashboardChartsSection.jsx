@@ -1,5 +1,5 @@
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { analyticsService } from '../../services/analyticsService';
@@ -8,7 +8,8 @@ const DashboardChartsSection = ({
   selectedYear,
   mesSeleccionadoNombre,
   chartData = [],
-  expensesByCategory = []
+  expensesByCategory = [],
+  altasYBajasAnual = []
 }) => {
   return (
     <div className="charts-grid">
@@ -104,6 +105,28 @@ const DashboardChartsSection = ({
               No hay gastos registrados este mes.
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
+        <div className="chart-header">
+          <div className="chart-title">Altas y Bajas Anuales ({selectedYear})</div>
+        </div>
+        <div style={{ flex: 1, width: '100%', minHeight: '280px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={altasYBajasAnual} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="name" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" allowDecimals={false} />
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#f3f4f6' }}
+                itemStyle={{ color: '#f3f4f6' }}
+              />
+              <Legend wrapperStyle={{ color: '#9ca3af' }} />
+              <Bar dataKey="Altas" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Bajas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

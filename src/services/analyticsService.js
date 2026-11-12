@@ -210,6 +210,48 @@ export const analyticsService = {
     return data;
   },
 
+  calcularAltasYBajasMes(movimientos = [], mes, año) {
+    const mesNum = Number(mes);
+    const añoNum = Number(año);
+
+    const movimientosMes = movimientos
+      .filter(m => Number(m.mes) === mesNum && Number(m.año) === añoNum)
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const listaAltas = movimientosMes.filter(m => m.tipo === 'alta');
+    const listaBajas = movimientosMes.filter(m => m.tipo === 'baja');
+
+    return {
+      altas: listaAltas.length,
+      bajas: listaBajas.length,
+      neto: listaAltas.length - listaBajas.length,
+      listaAltas,
+      listaBajas
+    };
+  },
+
+  calcularAltasYBajasAnual(movimientos = [], año) {
+    const añoNum = Number(año);
+    const data = [];
+
+    for (let m = 1; m <= 12; m++) {
+      const movimientosMes = movimientos.filter(
+        mov => Number(mov.mes) === m && Number(mov.año) === añoNum
+      );
+      const altas = movimientosMes.filter(mov => mov.tipo === 'alta').length;
+      const bajas = movimientosMes.filter(mov => mov.tipo === 'baja').length;
+
+      data.push({
+        name: MESES_CORTOS[m - 1],
+        Altas: altas,
+        Bajas: bajas,
+        Neto: altas - bajas
+      });
+    }
+
+    return data;
+  },
+
   getCategoryColor(name, index = 0) {
     if (name && CATEGORY_COLORS[name]) return CATEGORY_COLORS[name];
     let hash = 0;

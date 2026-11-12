@@ -24,6 +24,30 @@ export class VentusDatabase extends Dexie {
       productos: '++id, nombre, precio, activo',
       pagos: '++id, alumnoId, tipo, mes, año, importe, fecha, estadoPedido'
     });
+
+    this.version(5)
+      .stores({
+        movimientosAlumnos: '++id, alumnoId, tipo, fecha, mes, año, [año+mes]'
+      })
+      .upgrade(async tx => {
+        const alumnos = await tx.table('alumnos').toArray();
+        if (!alumnos.length) return;
+
+        const movimientos = alumnos.map(al => {
+          const parsedDate = al.fechaAlta ? new Date(al.fechaAlta) : new Date();
+          const fechaValida = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+          return {
+            alumnoId: al.id,
+            alumnoNombre: `${al.nombre || ''} ${al.apellidos || ''}`.trim(),
+            tipo: 'alta',
+            fecha: fechaValida.toISOString(),
+            mes: fechaValida.getMonth() + 1,
+            año: fechaValida.getFullYear()
+          };
+        });
+
+        await tx.table('movimientosAlumnos').bulkAdd(movimientos);
+      });
   }
 }
 

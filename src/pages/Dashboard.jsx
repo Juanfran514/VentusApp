@@ -13,6 +13,7 @@ import DashboardKpiRow from '../components/dashboard/DashboardKpiRow';
 import RecaudacionPendientePanel from '../components/dashboard/RecaudacionPendientePanel';
 import RentabilidadGruposSection from '../components/dashboard/RentabilidadGruposSection';
 import DashboardChartsSection from '../components/dashboard/DashboardChartsSection';
+import ModalAltasBajasMes from '../components/dashboard/ModalAltasBajasMes';
 import { FileDown } from 'lucide-react';
 import './Dashboard.css';
 
@@ -34,6 +35,13 @@ const Dashboard = () => {
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [isAltasBajasModalOpen, setIsAltasBajasModalOpen] = useState(false);
+
+  const movimientosAñoRaw = useLiveQuery(
+    () => alumnoService.getMovimientosByAño(selectedYear),
+    [selectedYear]
+  );
+  const movimientosAño = useMemo(() => movimientosAñoRaw || [], [movimientosAñoRaw]);
 
   const años = generarRangoAños(today.getFullYear(), 2, 2);
   const mesSeleccionadoNombre = getNombreMes(selectedMonth);
@@ -41,6 +49,16 @@ const Dashboard = () => {
   const activeStudentsCount = useMemo(
     () => alumnos.filter(a => a.estado === 'activo').length,
     [alumnos]
+  );
+
+  const altasYBajasMes = useMemo(
+    () => analyticsService.calcularAltasYBajasMes(movimientosAño, selectedMonth, selectedYear),
+    [movimientosAño, selectedMonth, selectedYear]
+  );
+
+  const altasYBajasAnual = useMemo(
+    () => analyticsService.calcularAltasYBajasAnual(movimientosAño, selectedYear),
+    [movimientosAño, selectedYear]
   );
 
   const currentMonthIncome = useMemo(
@@ -160,6 +178,8 @@ const Dashboard = () => {
 
       <DashboardKpiRow
         activeStudentsCount={activeStudentsCount}
+        altasYBajasMes={altasYBajasMes}
+        onOpenAltasBajasModal={() => setIsAltasBajasModalOpen(true)}
         currentMonthIncome={currentMonthIncome}
         currentMonthExpenses={currentMonthExpenses}
         currentMonthGain={currentMonthGain}
@@ -186,6 +206,16 @@ const Dashboard = () => {
         mesSeleccionadoNombre={mesSeleccionadoNombre}
         chartData={chartData}
         expensesByCategory={expensesByCategory}
+        altasYBajasAnual={altasYBajasAnual}
+      />
+
+      <ModalAltasBajasMes
+        isOpen={isAltasBajasModalOpen}
+        onClose={() => setIsAltasBajasModalOpen(false)}
+        mesNombre={mesSeleccionadoNombre}
+        año={selectedYear}
+        altasYBajas={altasYBajasMes}
+        alumnosMap={alumnosMap}
       />
     </div>
   );

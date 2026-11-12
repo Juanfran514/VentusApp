@@ -1,8 +1,10 @@
-import { Users, TrendingUp, TrendingDown, DollarSign, Clock } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, TrendingDown, DollarSign, Clock } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 const DashboardKpiRow = ({
   activeStudentsCount,
+  altasYBajasMes = { altas: 0, bajas: 0, neto: 0 },
+  onOpenAltasBajasModal,
   currentMonthIncome,
   currentMonthExpenses,
   currentMonthGain,
@@ -10,6 +12,9 @@ const DashboardKpiRow = ({
   netProfit,
   dineroPorRecaudar
 }) => {
+  const { altas = 0, bajas = 0, neto = 0 } = altasYBajasMes;
+  const netoLabel = neto > 0 ? `+${neto}` : `${neto}`;
+
   return (
     <div className="kpi-grid">
       <div className="kpi-card">
@@ -17,6 +22,33 @@ const DashboardKpiRow = ({
           <Users size={16} /> Alumnos Activos
         </div>
         <div className="kpi-value">{activeStudentsCount}</div>
+      </div>
+
+      <div
+        className="kpi-card"
+        role="button"
+        tabIndex={0}
+        onClick={onOpenAltasBajasModal}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && onOpenAltasBajasModal) {
+            e.preventDefault();
+            onOpenAltasBajasModal();
+          }
+        }}
+        style={{ cursor: onOpenAltasBajasModal ? 'pointer' : 'default' }}
+        title="Ver detalle de altas y bajas del mes"
+      >
+        <div className="kpi-title">
+          <UserPlus size={16} /> Altas / Bajas (Mes)
+        </div>
+        <div className="kpi-value" style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+          <span style={{ color: '#22c55e' }}>+{altas}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '1.3rem' }}>/</span>
+          <span style={{ color: '#ef4444' }}>-{bajas}</span>
+        </div>
+        <div className="kpi-subtext">
+          Neto: {netoLabel} • Pulsa para ver detalle
+        </div>
       </div>
 
       <div className="kpi-card">
